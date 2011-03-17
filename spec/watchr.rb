@@ -63,9 +63,8 @@ end
 def run_spec_files(files)
   files = Array(files)
   return if files.empty?
-  opts = File.readlines('spec/spec.opts').collect { |l| l.chomp }.join(" ")
   begin
-    run_spec("rspec #{files.join(' ')}")
+    system("rspec #{spec_opts} #{files.join(' ')}")
   rescue => detail
     puts detail.backtrace
     warn "Failed to run #{files.join(', ')}: #{detail}"
@@ -74,7 +73,11 @@ end
 
 def run_suite
   files = files("unit") + files("integration")
-  run_spec("rspec #{files.join(' ')}")
+  system("rspec #{spec_opts} #{files.join(' ')}")
+end
+
+def spec_opts
+  @opts ||= File.readlines('spec/spec.opts').collect { |l| l.chomp }.join(" ")
 end
 
 def files(dir)
