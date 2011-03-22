@@ -4,10 +4,10 @@ require File.expand_path(File.dirname(__FILE__) + '/../../../spec_helper.rb')
 require 'puppet/ssl/signed_cert'
 require 'tempfile'
 
-describe "Puppet::SSL::SignedCert::CA" do
+describe "Puppet::SSL::SignedCert::File" do
   before do
     Puppet::SSL::CertificateAuthority.stubs(:ca?).returns true
-    @terminus = Puppet::SSL::SignedCert.indirection.terminus(:ca)
+    @terminus = Puppet::SSL::SignedCert.indirection.terminus(:file)
 
     @tmpdir = Tempfile.new("signed_cert_ca_testing")
     @tmpdir.close
@@ -18,7 +18,7 @@ describe "Puppet::SSL::SignedCert::CA" do
   end
 
   it "should be a terminus on SignedCert" do
-    @terminus.should be_instance_of(Puppet::SSL::SignedCert::Ca)
+    @terminus.should be_instance_of(Puppet::SSL::SignedCert::File)
   end
 
   it "should create a CA instance if none is present" do

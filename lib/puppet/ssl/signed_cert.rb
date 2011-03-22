@@ -7,7 +7,7 @@ require 'puppet/indirector'
 class Puppet::SSL::SignedCert
   extend Puppet::Indirector
 
-  indirects :signed_cert
+  indirects :signed_cert, :terminus_class => :file
 
   attr_accessor :name, :csr, :certificate
 

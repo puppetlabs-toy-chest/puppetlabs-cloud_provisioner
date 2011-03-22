@@ -1,7 +1,7 @@
 require 'puppet'
 require 'puppet/ssl/signed_cert'
 
-class Puppet::SSL::SignedCert::Ca < Puppet::Indirector::Code
+class Puppet::SSL::SignedCert::File < Puppet::Indirector::Code
   def ca
     raise ArgumentError, "This process is not configured as a certificate authority" unless Puppet::SSL::CertificateAuthority.ca?
     Puppet::SSL::CertificateAuthority.new
