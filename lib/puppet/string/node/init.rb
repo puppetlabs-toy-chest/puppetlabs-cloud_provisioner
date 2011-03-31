@@ -6,8 +6,8 @@ Puppet::String.define :node, '0.0.1' do
     option '--image=', '-i='
     option '--keypair=', '-k='
     option '--group=', '-g=', '--security-group='
-    option '--login=', '-l=', '--username'
-    option '--keyfile=', '-k='
+    option '--login=', '-l=', '--username='
+    option '--keyfile='
     option '--tarball=', '--puppet='
     option '--answers='
     invoke do |name, options|
@@ -17,7 +17,7 @@ Puppet::String.define :node, '0.0.1' do
   end
 
   action :init do
-    option '--login=', '-l=', '--username'
+    option '--login=', '-l=', '--username='
     option '--keyfile=', '-k='
     option '--tarball=', '--puppet='
     option '--answers='
