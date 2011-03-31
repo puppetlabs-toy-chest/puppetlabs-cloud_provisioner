@@ -45,7 +45,7 @@ Puppet::String.define :node, '0.0.1' do
         puts "Failed: #{server.state_reason.inspect}"
       end
 
-      server
+      server.dns_name
     end
   end
 end

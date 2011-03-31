@@ -22,29 +22,39 @@ Puppet::String.define :node, '0.0.1' do
     option '--tarball=', '--puppet='
     option '--answers='
     invoke do |name, server, options|
-      server.username = options['login']
-      server.private_key_path = options['keyfile']
+      login   = options[:login]
+      keyfile = options[:keyfile]
+
+      opts = {}
+      opts[:key_data] = [File.read(keyfile)] if keyfile
+
+      ssh = Fog::SSH.new(server, login, opts)
+      scp = Fog::SCP.new(server, login, opts)
 
       print "Waiting for SSH response ..."
       retries = 0
       begin
         # TODO: Certain cases cause this to hang?
-        server.ssh(['hostname'])
-      rescue
-        sleep 60
+        ssh.run(['hostname'])
+      rescue Net::SSH::AuthenticationFailed
+        puts " Failed"
+        raise "Check your authentication credentials and try again."
+      rescue => e
+        sleep 5
         retries += 1
         print '.'
-        raise "SSH not responding; aborting." if retries > 5
+        puts " Failed"
+        raise "SSH not responding; aborting." if retries > 60
         retry
       end
       puts " Done"
 
       print "Uploading Puppet ..."
-      server.scp(options['tarball'], '/tmp/puppet.tar.gz')
+      scp.upload(options[:tarball], '/tmp/puppet.tar.gz')
       puts " Done"
 
       print "Uploading Puppet Answer File ..."
-      server.scp(option['answers'], '/tmp/puppet.answers')
+      scp.upload(options[:answers], '/tmp/puppet.answers')
       puts " Done"
 
       print "Installing Puppet ..."
@@ -52,7 +62,7 @@ Puppet::String.define :node, '0.0.1' do
         'tar -xvzf /tmp/puppet.tar.gz -C /tmp',
         '/tmp/puppet-enterprise-1.0-all/puppet-enterprise-installer -a /tmp/puppet.answers'
       ]
-      server.ssh(steps.map { |c| server.username == 'root' ? cmd : "sudo #{c}" })
+      ssh.run(steps.map { |c| login == 'root' ? cmd : "sudo #{c}" })
       puts " Done"
     end
   end
