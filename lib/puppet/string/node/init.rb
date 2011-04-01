@@ -11,8 +11,10 @@ Puppet::String.define :node, '0.0.1' do
     option '--tarball=', '--puppet='
     option '--answers='
     invoke do |name, options|
+      options[:_destroy_server_at_exit] = :bootstrap
       server = self.create(nil, options)
       self.init(nil, server, options)
+      options.delete(:_destroy_server_at_exit)
     end
   end
 
