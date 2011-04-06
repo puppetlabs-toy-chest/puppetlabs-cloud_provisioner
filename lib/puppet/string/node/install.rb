@@ -11,9 +11,9 @@ Puppet::String.define :node, '0.0.1' do
       login    = options[:login]
       keyfile  = options[:keyfile]
 
-      if not test(:f, '/usr/bin/uuidgen')
+      if not test('f', '/usr/bin/uuidgen')
         raise "/usr/bin/uuidgen does not exist; please install uuidgen."
-      elsif not test(:x, '/usr/bin/uuidgen')
+      elsif not test('x', '/usr/bin/uuidgen')
         raise "/usr/bin/uuidgen is not executable; please change that file's permissions."
       end
       certname = `/usr/bin/uuidgen`.downcase.chomp
