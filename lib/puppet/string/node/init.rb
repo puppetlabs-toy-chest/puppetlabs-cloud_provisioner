@@ -10,10 +10,10 @@ Puppet::String.define :node, '0.0.1' do
     option '--keyfile='
     option '--tarball=', '--puppet='
     option '--answers='
-    invoke do |name, options|
+    when_invoked do |options|
       options[:_destroy_server_at_exit] = :bootstrap
-      server = self.create(nil, options)
-      self.init(nil, server, options)
+      server = self.create(options)
+      self.init(server, options)
       options.delete(:_destroy_server_at_exit)
     end
   end
@@ -23,9 +23,9 @@ Puppet::String.define :node, '0.0.1' do
     option '--keyfile=', '-k='
     option '--tarball=', '--puppet='
     option '--answers='
-    invoke do |name, server, options|
-      login   = options[:login]
-      keyfile = options[:keyfile]
+    when_invoked do |server, options|
+      login    = options[:login]
+      keyfile  = options[:keyfile]
 
       opts = {}
       opts[:key_data] = [File.read(keyfile)] if keyfile
