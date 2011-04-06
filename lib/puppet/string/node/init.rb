@@ -27,6 +27,13 @@ Puppet::String.define :node, '0.0.1' do
       login    = options[:login]
       keyfile  = options[:keyfile]
 
+      if not test(:f, '/usr/bin/uuidgen')
+        raise "/usr/bin/uuidgen does not exist; please install uuidgen."
+      elsif not test(:x, '/usr/bin/uuidgen')
+        raise "/usr/bin/uuidgen is not executable; please change that file's permissions."
+      end
+      certname = `/usr/bin/uuidgen`.downcase.chomp
+
       opts = {}
       opts[:key_data] = [File.read(keyfile)] if keyfile
 
@@ -62,10 +69,13 @@ Puppet::String.define :node, '0.0.1' do
       print "Installing Puppet ..."
       steps = [
         'tar -xvzf /tmp/puppet.tar.gz -C /tmp',
-        '/tmp/puppet-enterprise-1.0-all/puppet-enterprise-installer -a /tmp/puppet.answers'
+        %Q[echo "q_puppetagent_certname='#{ certname }'" >> /tmp/puppet.answers],
+        '/tmp/puppet-enterprise-1.0-all/puppet-enterprise-installer -a /tmp/puppet.answers &> /tmp/install.log'
       ]
       ssh.run(steps.map { |c| login == 'root' ? cmd : "sudo #{c}" })
       puts " Done"
+
+      return certname
     end
   end
 end
