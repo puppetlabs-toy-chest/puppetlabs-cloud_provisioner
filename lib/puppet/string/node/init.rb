@@ -2,22 +2,6 @@ require 'rubygems'
 require 'fog'
 
 Puppet::String.define :node, '0.0.1' do
-  action :bootstrap do
-    option '--image=', '-i='
-    option '--keypair=', '-k='
-    option '--group=', '-g=', '--security-group='
-    option '--login=', '-l=', '--username='
-    option '--keyfile='
-    option '--tarball=', '--puppet='
-    option '--answers='
-    when_invoked do |options|
-      options[:_destroy_server_at_exit] = :bootstrap
-      server = self.create(options)
-      self.init(server, options)
-      options.delete(:_destroy_server_at_exit)
-    end
-  end
-
   action :init do
     option '--login=', '-l=', '--username='
     option '--keyfile=', '-k='
