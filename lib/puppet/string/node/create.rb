@@ -6,7 +6,7 @@ Puppet::String.define :node, '0.0.1' do
     option '--image=', '-i='
     option '--keypair=', '-k='
     option '--group=', '-g=', '--security-group='
-    invoke do |name, options|
+    when_invoked do |options|
       unless options.has_key? :_destroy_server_at_exit
         options[:_destroy_server_at_exit] = :create
       end
