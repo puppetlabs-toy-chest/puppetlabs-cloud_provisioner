@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'fog'
 
-Puppet::String.define :node, '0.0.1' do
+Puppet::Faces.define :node, '0.0.1' do
   action :create do
     option '--image=', '-i='
     option '--keypair=', '-k='
