@@ -43,7 +43,7 @@ Puppet::Faces.define :node, '0.0.1' do
       puts " Done"
 
       print "Uploading Puppet ..."
-      # scp.upload(options[:tarball], '/tmp/puppet.tar.gz')
+      scp.upload(options[:tarball], '/tmp/puppet.tar.gz')
       puts " Done"
 
       print "Uploading Puppet Answer File ..."
@@ -52,7 +52,7 @@ Puppet::Faces.define :node, '0.0.1' do
 
       print "Installing Puppet ..."
       steps = [
-        # 'tar -xvzf /tmp/puppet.tar.gz -C /tmp',
+        'tar -xvzf /tmp/puppet.tar.gz -C /tmp',
         %Q[echo "q_puppetagent_certname='#{ certname }'" >> /tmp/puppet.answers],
         '/tmp/puppet-enterprise-1.0-all/puppet-enterprise-installer -a /tmp/puppet.answers &> /tmp/install.log'
       ]
