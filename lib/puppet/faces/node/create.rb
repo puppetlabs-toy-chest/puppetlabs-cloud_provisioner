@@ -32,11 +32,18 @@ Puppet::Faces.define :node, '0.0.1' do
         :resource_id => server.id
       )
       puts ' Done'
-
       print "Starting up "
-      while server.state == 'pending'
-        print '.'
-        server.reload
+      start_time = Time.now
+      begin
+        while server.state == 'pending'
+          print '.'
+          server.reload
+        end 
+      rescue Excon::Errors::SocketError => e
+        sleep 2
+        print "E"
+        raise "Cannot connect to AWS; aborting." if Time.now - start_time > 360
+        retry
       end
       puts " Done"
 
