@@ -42,6 +42,7 @@ Puppet::Faces.define :node, '0.0.1' do
 
       if server.state == 'running'
         # TODO: Find a better way of getting the Fingerprints
+        Puppet.debug("Created server instance: #{server.dns_name}")
         print "Waiting for host fingerprints "
         while server.console_output.body['output'].nil?
           print '.'
