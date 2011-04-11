@@ -43,9 +43,17 @@ Puppet::Faces.define :node, '0.0.1' do
       if server.state == 'running'
         # TODO: Find a better way of getting the Fingerprints
         print "Waiting for host fingerprints "
-        while server.console_output.body['output'].nil?
-          print '.'
+       start_time = Time.now
+        begin
+          while server.console_output.body['output'].nil?
+            print '.'
+            sleep 2
+          end
+        rescue Excon::Errors::SocketError => e
           sleep 2
+          print "E"
+          raise "Cannot connect to AWS; aborting." if Time.now - start_time > 360
+          retry
         end
         puts ' Done'
         puts
