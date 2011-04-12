@@ -9,7 +9,7 @@ Puppet::Faces.define :node, '0.0.1' do
     option '--answers='
     when_invoked do |server, options|
       certname = install(server, options)
-      options[:_destroy_server_at_exit] = :false
+      options.delete(:_destroy_server_at_exit)
 
       # TODO: Register / classify node with ENC.
 
@@ -19,7 +19,6 @@ Puppet::Faces.define :node, '0.0.1' do
       # TODO: Wait for C.S.R.?
 
       print "Signing certificate ..."
-      Puppet::SSL::Host.ca_location = :remote
       begin
         Puppet::Faces[:certificate, '0.0.1'].sign(certname, opts)
         puts " Done"
