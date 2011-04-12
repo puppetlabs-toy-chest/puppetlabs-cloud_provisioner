@@ -69,6 +69,9 @@ RSpec.configure do |config|
 
     # Avoid opening ports to the outside world
     Puppet.settings[:bindaddress] = "127.0.0.1"
+
+    @logs = []
+    Puppet::Util::Log.newdestination(Puppet::Test::LogCollector.new(@logs))
   end
 end
 
