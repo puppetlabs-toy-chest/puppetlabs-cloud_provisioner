@@ -1,7 +1,4 @@
-require 'rubygems'
-require 'fog'
-
-Puppet::Faces.define :node, '0.0.1' do
+Puppet::Face.define :node, '0.0.1' do
   action :init do
     option '--login=', '-l=', '--username='
     option '--keyfile=', '-k='
@@ -20,7 +17,7 @@ Puppet::Faces.define :node, '0.0.1' do
 
       print "Signing certificate ..."
       begin
-        Puppet::Faces[:certificate, '0.0.1'].sign(certname, opts)
+        Puppet::Face[:certificate, '0.0.1'].sign(certname, opts)
         puts " Done"
       rescue Puppet::Error => e
         # TODO: Write useful next steps.

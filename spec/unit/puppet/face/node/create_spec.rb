@@ -1,12 +1,12 @@
 require 'spec_helper'
 require 'puppet/faces'
 
-describe Puppet::Faces[:node, '0.0.1'] do
+describe Puppet::Face[:node, '0.0.1'] do
   before(:all) { @stdout = $stdout }
   after(:all)  { $stdout = @stdout }
 
   def server
-    stub = Puppet::Faces[:node, '0.0.1'].stubs(:create_server)
+    stub = Puppet::Face[:node, '0.0.1'].stubs(:create_server)
     stub.with do |servers, options|
       server = servers.create(options)
       stub.returns(server)
@@ -35,7 +35,7 @@ describe Puppet::Faces[:node, '0.0.1'] do
         @server = subject.create_connection().servers.first
       end
 
-      it 'should tag the newly created instance as created by us' do
+      it 'should ta`g the newly created instance as created by us' do
         @server.tags.should include('Created-By' => 'Puppet')
       end
 
@@ -55,7 +55,7 @@ describe Puppet::Faces[:node, '0.0.1'] do
     describe 'in exceptional situations' do
       before(:all) { @options = { :image => 'ami-12345' } }
 
-      subject { Puppet::Faces[:node, '0.0.1'].create(@options) }
+      subject { Puppet::Face[:node, '0.0.1'].create(@options) }
 
       describe 'like when waiting for fingerprints times out' do
         before :each do

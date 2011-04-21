@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'fog'
 
-Puppet::Faces.define :node, '0.0.1' do
+Puppet::Face.define :node, '0.0.1' do
   action :create do
     # TODO: Should mark certain options as required.
     # TODO: Validate parameters.
