@@ -7,6 +7,7 @@ Puppet::Face.define :node, '0.0.1' do
     option '--keyfile='
     option '--tarball=', '--puppet='
     option '--answers='
+    option '--node-group=', '--as='
     when_invoked do |options|
       options[:_destroy_server_at_exit] = :bootstrap
       server = self.create(options)
