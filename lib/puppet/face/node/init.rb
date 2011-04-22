@@ -4,11 +4,14 @@ Puppet::Face.define :node, '0.0.1' do
     option '--keyfile=', '-k='
     option '--tarball=', '--puppet='
     option '--answers='
+    option '--node-group=', '--as='
     when_invoked do |server, options|
       certname = install(server, options)
       options.delete(:_destroy_server_at_exit)
 
-      # TODO: Register / classify node with ENC.
+      puts "Puppet Enterprise is now installed on: #{server}"
+
+      classify(certname, options)
 
       # HACK: This should be reconciled with the Certificate Face.
       opts = options.merge(:ca_location => :remote)

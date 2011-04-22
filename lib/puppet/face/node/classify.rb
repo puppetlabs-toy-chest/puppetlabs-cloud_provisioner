@@ -6,6 +6,7 @@ Puppet::Face.define :node, '0.0.1' do
       required
     end
     when_invoked do |certname, options|
+      puts "Using http://#{Puppet[:report_server]}:#{Puppet[:report_port]} as Dashboard."
       http = Puppet::Network::HttpPool.http_instance(Puppet[:report_server], Puppet[:report_port])
 
       # Workaround for the fact that Dashboard is typically insecure.
