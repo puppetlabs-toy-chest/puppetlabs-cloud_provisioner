@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'puppet/faces'
 
 describe Puppet::Face[:node, '0.0.1'] do
   before(:all) { @stdout = $stdout }
@@ -35,7 +34,7 @@ describe Puppet::Face[:node, '0.0.1'] do
         @server = subject.create_connection().servers.first
       end
 
-      it 'should ta`g the newly created instance as created by us' do
+      it 'should tag the newly created instance as created by us' do
         @server.tags.should include('Created-By' => 'Puppet')
       end
 
