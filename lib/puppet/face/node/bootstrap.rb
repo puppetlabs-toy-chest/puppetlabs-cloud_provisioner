@@ -1,18 +1,10 @@
+require 'puppet/cloudpack'
+
 Puppet::Face.define :node, '0.0.1' do
   action :bootstrap do
-    option '--image=', '-i='
-    option '--keypair=', '-k='
-    option '--group=', '-g=', '--security-group='
-    option '--login=', '-l=', '--username='
-    option '--keyfile='
-    option '--installer-payload='
-    option '--installer-answers='
-    option '--node-group=', '--as='
+    Puppet::CloudPack.add_bootstrap_options(self)
     when_invoked do |options|
-      options[:_destroy_server_at_exit] = :bootstrap
-      server = self.create(options)
-      self.init(server, options)
-      options.delete(:_destroy_server_at_exit)
+      Puppet::Cloudpack.bootstrap(options)
     end
   end
 end
