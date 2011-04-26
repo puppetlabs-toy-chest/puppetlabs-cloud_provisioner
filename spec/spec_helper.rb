@@ -11,6 +11,7 @@ $LOAD_PATH.unshift("#{dir}/../lib")
 ARGV.clear
 
 require 'puppet'
+require 'puppet/face'
 require 'mocha'
 require 'fog'
 gem 'rspec', '>=2.0.0'
