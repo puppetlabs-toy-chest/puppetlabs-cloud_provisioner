@@ -8,7 +8,7 @@ module Puppet::CloudPack
       # TODO: Should mark certain options as required.
       # TODO: Validate parameters.
       action.option '--image=', '-i='
-      action.option '--keypair=', '-k='
+      action.option '--keypair='
       action.option '--group=', '-g=', '--security-group='
     end
 
@@ -28,7 +28,7 @@ module Puppet::CloudPack
 
     def add_install_options(action)
       action.option '--login=', '-l=', '--username='
-      action.option '--keyfile=', '-k='
+      action.option '--keyfile='
       action.option '--installer-payload='
       action.option '--installer-answers='
     end
