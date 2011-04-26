@@ -5,8 +5,8 @@ Puppet::Face.define :node, '0.0.1' do
     option '--group=', '-g=', '--security-group='
     option '--login=', '-l=', '--username='
     option '--keyfile='
-    option '--tarball=', '--puppet='
-    option '--answers='
+    option '--installer-payload='
+    option '--installer-answers='
     option '--node-group=', '--as='
     when_invoked do |options|
       options[:_destroy_server_at_exit] = :bootstrap

@@ -2,8 +2,8 @@ Puppet::Face.define :node, '0.0.1' do
   action :init do
     option '--login=', '-l=', '--username='
     option '--keyfile=', '-k='
-    option '--tarball=', '--puppet='
-    option '--answers='
+    option '--installer-payload='
+    option '--installer-answers='
     option '--node-group=', '--as='
     when_invoked do |server, options|
       certname = install(server, options)
