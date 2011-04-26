@@ -4,9 +4,22 @@ require 'puppet/network/http_pool'
 
 module Puppet::CloudPack
   class << self
+    def add_platform_option(action)
+      action.option '--platform=' do
+        required
+        before_action do |action, args, options|
+          supported_platforms = [ 'AWS' ]
+          unless supported_platforms.include?(options[:platform])
+            raise ArgumentError, "Platform must be one of the following: #{supported_platforms.join(', ')}"
+          end
+        end
+      end
+    end
+
     def add_create_options(action)
       # TODO: Should mark certain options as required.
       # TODO: Validate parameters.
+      add_platform_option(action)
       action.option '--image=', '-i='
       action.option '--keypair='
       action.option '--group=', '-g=', '--security-group='
@@ -18,6 +31,7 @@ module Puppet::CloudPack
     end
 
     def add_terminate_options(action)
+      add_platform_option(action)
       action.option '--force', '-f'
     end
 
@@ -92,7 +106,7 @@ module Puppet::CloudPack
         options[:_destroy_server_at_exit] = :create
       end
 
-      connection = create_connection()
+      connection = create_connection(options)
 
       # TODO: Validate that the security groups permit SSH access from here.
       # TODO: Can this throw errors?
@@ -230,7 +244,7 @@ module Puppet::CloudPack
     end
 
     def terminate(server, options)
-      connection = create_connection()
+      connection = create_connection(options)
 
       servers = connection.servers.all('dns-name' => server)
       if servers.length == 1 || options[:force]
@@ -245,7 +259,7 @@ module Puppet::CloudPack
     end
 
     private
-    def create_connection(options = { :provider => 'AWS' })
+    def create_connection(options = {})
       print 'Connecting to AWS ...'
       connection = Fog::Compute.new(options)
       puts ' Done'
