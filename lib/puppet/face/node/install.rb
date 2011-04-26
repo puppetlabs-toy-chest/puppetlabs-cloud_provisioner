@@ -5,8 +5,8 @@ Puppet::Face.define :node, '0.0.1' do
   action :install do
     option '--login=', '-l=', '--username='
     option '--keyfile=', '-k='
-    option '--tarball=', '--puppet='
-    option '--answers='
+    option '--installer-payload='
+    option '--installer-answers='
     when_invoked do |server, options|
       login    = options[:login]
       keyfile  = options[:keyfile]
@@ -43,11 +43,11 @@ Puppet::Face.define :node, '0.0.1' do
       puts " Done"
 
       print "Uploading Puppet ..."
-      scp.upload(options[:tarball], '/tmp/puppet.tar.gz')
+      scp.upload(options[:installer_payload], '/tmp/puppet.tar.gz')
       puts " Done"
 
       print "Uploading Puppet Answer File ..."
-      scp.upload(options[:answers], '/tmp/puppet.answers')
+      scp.upload(options[:installer_answers], '/tmp/puppet.answers')
       puts " Done"
 
       print "Installing Puppet ..."
