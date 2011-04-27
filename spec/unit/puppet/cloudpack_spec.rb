@@ -31,8 +31,8 @@ describe Puppet::CloudPack do
       describe 'with valid arguments' do
         before :all do
           stub_console_output("pre\nec2: ####\nec2: PRINTS\nec2: ####\npost\n")
-          @result = subject.create(:image => 'ami-12345')
-          @server = subject.send(:create_connection).servers.first
+          @result = subject.create(:platform => 'AWS', :image => 'ami-12345')
+          @server = Fog::Compute.new(:provider => 'AWS').servers.first
         end
 
         it 'should tag the newly created instance as created by us' do
@@ -53,7 +53,7 @@ describe Puppet::CloudPack do
       end
 
       describe 'in exceptional situations' do
-        before(:all) { @options = { :image => 'ami-12345' } }
+        before(:all) { @options = { :platform => 'AWS', :image => 'ami-12345' } }
 
         subject { Puppet::CloudPack.create(@options) }
 
@@ -132,8 +132,8 @@ describe Puppet::CloudPack do
   describe 'helper functions' do
     describe '#create_connection' do
       it 'should create a new connection' do
-        Fog::Compute.expects(:new)
-        subject.send :create_connection
+        Fog::Compute.expects(:new).with(:provider => 'SomeProvider')
+        subject.send :create_connection, :platform => 'SomeProvider'
       end
     end
 
