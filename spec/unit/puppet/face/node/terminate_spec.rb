@@ -10,17 +10,19 @@ describe Puppet::Face[:node, :current] do
 
   describe 'option validation' do
     before :each do
-      Puppet::CloudPack.stubs(:create)
+      Puppet::CloudPack.stubs(:terminate)
     end
 
-    it 'should require a provider' do
-      @options.delete(:platform)
-      expect { subject.terminate('server', @options) }.to raise_error ArgumentError, /required/
-    end
+    describe '(platform)' do
+      it 'should require a platform' do
+        @options.delete(:platform)
+        expect { subject.terminate('server', @options) }.to raise_error ArgumentError, /required/
+      end
 
-    it 'should validate the provider' do
-      @options[:platform] = 'UnsupportedProvider'
-      expect { subject.terminate('server', @options) }.to raise_error ArgumentError, /one of/
+      it 'should validate the platform' do
+        @options[:platform] = 'UnsupportedProvider'
+        expect { subject.terminate('server', @options) }.to raise_error ArgumentError, /one of/
+      end
     end
   end
 end
