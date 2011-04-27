@@ -17,11 +17,17 @@ module Puppet::CloudPack
     end
 
     def add_create_options(action)
-      # TODO: Should mark certain options as required.
       # TODO: Validate parameters.
       add_platform_option(action)
-      action.option '--image=', '-i='
-      action.option '--keypair='
+
+      action.option '--image=', '-i=' do
+        required
+      end
+
+      action.option '--keypair=' do
+        required
+      end
+
       action.option '--group=', '-g=', '--security-group='
     end
 
@@ -41,10 +47,21 @@ module Puppet::CloudPack
     end
 
     def add_install_options(action)
-      action.option '--login=', '-l=', '--username='
-      action.option '--keyfile='
-      action.option '--installer-payload='
-      action.option '--installer-answers='
+      action.option '--login=', '-l=', '--username=' do
+        required
+      end
+
+      action.option '--keyfile=' do
+        required
+      end
+
+      action.option '--installer-payload=' do
+        required
+      end
+
+      action.option '--installer-answers=' do
+        required
+      end
     end
 
     def add_classify_options(action)

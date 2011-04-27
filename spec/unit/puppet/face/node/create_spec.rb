@@ -15,14 +15,30 @@ describe Puppet::Face[:node, :current] do
       Puppet::CloudPack.stubs(:create)
     end
 
-    it 'should require a provider' do
-      @options.delete(:platform)
-      expect { subject.create(@options) }.to raise_error ArgumentError, /required/
+    describe '(platform)' do
+      it 'should require a platform' do
+        @options.delete(:platform)
+        expect { subject.create(@options) }.to raise_error ArgumentError, /required/
+      end
+
+      it 'should validate the platform' do
+        @options[:platform] = 'UnsupportedProvider'
+        expect { subject.create(@options) }.to raise_error ArgumentError, /one of/
+      end
     end
 
-    it 'should validate the provider' do
-      @options[:platform] = 'UnsupportedProvider'
-      expect { subject.create(@options) }.to raise_error ArgumentError, /one of/
+    describe '(image)' do
+      it 'should require an image' do
+        @options.delete(:image)
+        expect { subject.create(@options) }.to raise_error ArgumentError, /required/
+      end
+    end
+
+    describe '(keypair)' do
+      it 'should require a keypair name' do
+        @options.delete(:keypair)
+        expect { subject.create(@options) }.to raise_error ArgumentError, /required/
+      end
     end
   end
 end
