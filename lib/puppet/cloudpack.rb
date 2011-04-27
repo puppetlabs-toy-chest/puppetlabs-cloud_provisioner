@@ -260,8 +260,8 @@ module Puppet::CloudPack
 
     private
     def create_connection(options = {})
-      print 'Connecting to AWS ...'
-      connection = Fog::Compute.new(options)
+      print "Connecting to #{options[:platform]} ..."
+      connection = Fog::Compute.new(:provider => options[:platform])
       puts ' Done'
       return connection
     end
