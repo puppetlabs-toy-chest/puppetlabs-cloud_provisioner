@@ -10,7 +10,7 @@ describe Puppet::Face[:node, :current] do
 
   describe 'option validation' do
     before :each do
-      Puppet::CloudPack.stubs(:classify)
+      Puppet::CloudPack.expects(:classify).never
     end
 
     describe '(node-group)' do
