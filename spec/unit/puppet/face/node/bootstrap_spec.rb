@@ -17,7 +17,7 @@ describe Puppet::Face[:node, :current] do
 
   describe 'option validation' do
     before :each do
-      Puppet::CloudPack.stubs(:bootstrap)
+      Puppet::CloudPack.expects(:bootstrap).never
     end
 
     describe '(platform)' do

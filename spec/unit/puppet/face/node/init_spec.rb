@@ -14,7 +14,7 @@ describe Puppet::Face[:node, :current] do
 
   describe 'option validation' do
     before :each do
-      Puppet::CloudPack.stubs(:init)
+      Puppet::CloudPack.expects(:init).never
     end
 
     describe '(login)' do

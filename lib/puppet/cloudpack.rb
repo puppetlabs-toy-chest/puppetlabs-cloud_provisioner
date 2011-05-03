@@ -17,18 +17,37 @@ module Puppet::CloudPack
     end
 
     def add_create_options(action)
-      # TODO: Validate parameters.
       add_platform_option(action)
 
       action.option '--image=', '-i=' do
         required
+        before_action do |action, args, options|
+          if Puppet::CloudPack.create_connection(options).images.get(options[:image]).nil?
+            raise ArgumentError, "Unrecognized image name: #{options[:image]}"
+          end
+        end
       end
 
       action.option '--keypair=' do
         required
+        before_action do |action, args, options|
+          if Puppet::CloudPack.create_connection(options).key_pairs.get(options[:keypair]).nil?
+            raise ArgumentError, "Unrecognized keypair name: #{options[:keypair]}"
+          end
+        end
       end
 
-      action.option '--group=', '-g=', '--security-group='
+      action.option '--group=', '-g=', '--security-group=' do
+        before_action do |action, args, options|
+          options[:group] = options[:group].split(File::PATH_SEPARATOR) unless options[:group].is_a? Array
+
+          known = Puppet::CloudPack.create_connection(options).security_groups
+          unknown = options[:group].select { |g| known.get(g).nil? }
+          unless unknown.empty?
+            raise ArgumentError, "Unrecognized security groups: #{unknown.join(', ')}"
+          end
+        end
+      end
     end
 
     def add_init_options(action)
@@ -53,14 +72,38 @@ module Puppet::CloudPack
 
       action.option '--keyfile=' do
         required
+        before_action do |action, arguments, options|
+          unless test 'f', options[:keyfile]
+            raise ArgumentError, "Could not find file '#{options[:keyfile]}'"
+          end
+          unless test 'r', options[:keyfile]
+            raise ArgumentError, "Could not read from file '#{options[:keyfile]}'"
+          end
+        end
       end
 
       action.option '--installer-payload=' do
         required
+        before_action do |action, arguments, options|
+          unless test 'f', options[:installer_payload]
+            raise ArgumentError, "Could not find file '#{options[:installer_payload]}'"
+          end
+          unless test 'r', options[:installer_payload]
+            raise ArgumentError, "Could not read from file '#{options[:installer_payload]}'"
+          end
+        end
       end
 
       action.option '--installer-answers=' do
         required
+        before_action do |action, arguments, options|
+          unless test 'f', options[:installer_answers]
+            raise ArgumentError, "Could not find file '#{options[:installer_answers]}'"
+          end
+          unless test 'r', options[:installer_answers]
+            raise ArgumentError, "Could not read from file '#{options[:installer_answers]}'"
+          end
+        end
       end
     end
 
@@ -123,14 +166,16 @@ module Puppet::CloudPack
         options[:_destroy_server_at_exit] = :create
       end
 
+      print "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
+      puts ' Done'
 
       # TODO: Validate that the security groups permit SSH access from here.
       # TODO: Can this throw errors?
       server     = create_server(connection.servers,
         :image_id => options[:image],
         :key_name => options[:keypair],
-        :groups   => (options[:group] || '').split(File::PATH_SEPARATOR)
+        :groups   => options[:group]
       )
 
       Signal.trap(:EXIT) do
@@ -261,7 +306,9 @@ module Puppet::CloudPack
     end
 
     def terminate(server, options)
+      print "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
+      puts ' Done'
 
       servers = connection.servers.all('dns-name' => server)
       if servers.length == 1 || options[:force]
@@ -275,12 +322,9 @@ module Puppet::CloudPack
       return nil
     end
 
-    private
+
     def create_connection(options = {})
-      print "Connecting to #{options[:platform]} ..."
-      connection = Fog::Compute.new(:provider => options[:platform])
-      puts ' Done'
-      return connection
+      Fog::Compute.new(:provider => options[:platform])
     end
 
     def create_server(servers, options = {})
