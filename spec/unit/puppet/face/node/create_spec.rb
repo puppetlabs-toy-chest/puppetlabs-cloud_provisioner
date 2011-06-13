@@ -33,6 +33,18 @@ describe Puppet::Face[:node, :current] do
       end
     end
 
+    describe '(type)' do
+      it 'should require a type' do
+        @options.delete(:type)
+        expect { subject.create(@options) }.to raise_error ArgumentError, /required/
+      end
+
+      it 'should validate the tyoe' do
+        @options[:type] = 'UnsupportedType'
+        expect { subject.create(@options) }.to raise_error ArgumentError, /one of/
+      end
+    end
+
     describe '(image)' do
       it 'should require an image' do
         @options.delete(:image)
