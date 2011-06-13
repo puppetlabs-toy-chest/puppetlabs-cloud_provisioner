@@ -28,6 +28,16 @@ module Puppet::CloudPack
         end
       end
 
+      action.option '--type=' do
+        required
+        before_action do |action, args, options|
+          supported_types = ['m1.small','m1.large','m1.xlarge','t1.micro','m2.xlarge','m2.2xlarge','x2.4xlarge','c1.medium','c1.xlarge','cc1.4xlarge']
+          unless supported_types.include?(options[:type])
+            raise ArgumentError, "Platform must be one of the following: #{supported_types.join(', ')}"
+          end
+        end
+      end
+
       action.option '--keypair=' do
         required
         before_action do |action, args, options|
@@ -169,13 +179,15 @@ module Puppet::CloudPack
       print "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
       puts ' Done'
+      puts "#{options[:type]}"
 
       # TODO: Validate that the security groups permit SSH access from here.
       # TODO: Can this throw errors?
       server     = create_server(connection.servers,
-        :image_id => options[:image],
-        :key_name => options[:keypair],
-        :groups   => options[:group]
+        :image_id   => options[:image],
+        :key_name   => options[:keypair],
+        :groups     => options[:group],
+        :flavor_id  => options[:type]
       )
 
       Signal.trap(:EXIT) do
