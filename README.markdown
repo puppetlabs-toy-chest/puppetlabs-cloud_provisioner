@@ -6,4 +6,5 @@ Puppet Plugins for managing in the cloud.
 Getting Started
 ===============
 
-http://docs.puppetlabs.com/guides/cloud_pack_getting_started.html
+ * [Getting Started With CloudPack](http://docs.puppetlabs.com/guides/cloud_pack_getting_started.html)
+
