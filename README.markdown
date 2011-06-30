@@ -10,6 +10,12 @@ Getting Started
 
  * [Getting Started With CloudPack](http://docs.puppetlabs.com/guides/cloud_pack_getting_started.html)
 
+AMI Image
+---------
+
+A good image to get started with is *ami-90f607f9* named
+"RightImage\_CentOS\_5.4\_i386\_v5.6.8.1"
+
 Building the Module
 ===================
 
