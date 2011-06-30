@@ -11,7 +11,8 @@ describe Puppet::Face[:node, :current] do
       :keyfile           => 'file_on_disk.txt',
       :installer_payload => 'some.tar.gz',
       :installer_answers => 'some.answers',
-      :node_group        => 'webserver'
+      :node_group        => 'webserver',
+      :type              => 'm1.small',
     }
   end
 
