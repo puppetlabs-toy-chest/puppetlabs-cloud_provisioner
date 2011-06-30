@@ -12,6 +12,7 @@ describe Puppet::Face[:node, :current] do
     @options = {
       :platform => 'AWS',
       :image    => 'ami-12345',
+      :type     => 'm1.small',
       :keypair  => 'some_keypair'
     }
   end
