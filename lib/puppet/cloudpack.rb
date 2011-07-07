@@ -311,7 +311,7 @@ module Puppet::CloudPack
         %Q[echo "q_puppetagent_certname='#{ certname }'" >> /tmp/puppet.answers],
         '/tmp/puppet-enterprise-1.0-all/puppet-enterprise-installer -a /tmp/puppet.answers &> /tmp/install.log'
       ]
-      ssh.run(steps.map { |c| login == 'root' ? cmd : "sudo #{c}" })
+      ssh.run(steps.map { |c| login == 'root' ? c : "sudo #{c}" })
       puts " Done"
 
       return certname
