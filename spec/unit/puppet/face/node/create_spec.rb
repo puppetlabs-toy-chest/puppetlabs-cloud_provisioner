@@ -1,7 +1,7 @@
 require 'spec_helper'
 require 'puppet/cloudpack'
 
-describe Puppet::Face[:node, :current] do
+describe Puppet::Face[:cloudnode, :current] do
   before :all do
     data = Fog::AWS::Compute::Mock.data['us-east-1'][Fog.credentials[:aws_access_key_id]]
     data[:images]['ami-12345'] = { 'imageId' => 'ami-12345' }
