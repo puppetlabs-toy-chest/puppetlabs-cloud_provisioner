@@ -62,6 +62,13 @@ describe Puppet::Face[:cloudnode, :current] do
         File.chmod 0300, @options[:installer_payload]
         expect { subject.install('server', @options) }.to raise_error ArgumentError, /could not read/i
       end
+
+      it 'should warn if the payload does not have either tgz or gz extension' do
+        @options[:installer_payload] = Tempfile.new('foo.tar').path
+        Puppet.expects(:warning).with("Option: intaller-payload expects a .tgz or .gz file")
+        Puppet::CloudPack.expects(:install)
+        subject.install('server', @options)
+      end
     end
 
     describe '(installer-answers)' do

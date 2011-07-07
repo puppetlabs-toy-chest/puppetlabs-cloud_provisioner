@@ -101,6 +101,9 @@ module Puppet::CloudPack
           unless test 'r', options[:installer_payload]
             raise ArgumentError, "Could not read from file '#{options[:installer_payload]}'"
           end
+          unless(options[:installer_payload] =~ /(tgz|gz)$/)
+            Puppet.warning("Option: intaller-payload expects a .tgz or .gz file")
+          end
         end
       end
 
