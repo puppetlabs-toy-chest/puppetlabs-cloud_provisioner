@@ -6,6 +6,11 @@ module Puppet::CloudPack
   class << self
     def add_platform_option(action)
       action.option '--platform=' do
+        summary 'Platform used to create machine instance (only supports AWS).'
+        description <<-EOT
+          The Cloud platform used to create new machine instances.
+          Currently, AWS (Amazon Web Services) is the only supported platform.
+        EOT
         required
         before_action do |action, args, options|
           supported_platforms = [ 'AWS' ]
@@ -20,6 +25,12 @@ module Puppet::CloudPack
       add_platform_option(action)
 
       action.option '--image=', '-i=' do
+        summary 'AMI to use when creating the instance.'
+        description <<-EOT
+          Pre-configured operating system image used to create machine instance.
+          This currently only supports AMI images.
+          Example of a Redhat 5.6 32bit image: ami-b241bfdb
+        EOT
         required
         before_action do |action, args, options|
           if Puppet::CloudPack.create_connection(options).images.get(options[:image]).nil?
@@ -29,6 +40,14 @@ module Puppet::CloudPack
       end
 
       action.option '--type=' do
+        summary 'Type of instance.'
+        description <<-EOT
+          Type of instance to be launched. Type specifies characteristics that
+          a machine will have such as architecture, memory, processing power, storage
+          and IO performance. The type selected will determine the cost of a machine instance.
+          Supported types are: 'm1.small','m1.large','m1.xlarge','t1.micro','m2.xlarge',
+          'm2.2xlarge','x2.4xlarge','c1.medium','c1.xlarge','cc1.4xlarge'.
+        EOT
         required
         before_action do |action, args, options|
           supported_types = ['m1.small','m1.large','m1.xlarge','t1.micro','m2.xlarge','m2.2xlarge','x2.4xlarge','c1.medium','c1.xlarge','cc1.4xlarge']
@@ -39,6 +58,12 @@ module Puppet::CloudPack
       end
 
       action.option '--keypair=' do
+        summary 'SSH keypair used to access the instance.'
+        description <<-EOT
+          The key pair that will be used to ssh into your machine instance
+          once it has been created. This expects the id of the ssh keypair as
+          represented in the aws console.
+        EOT
         required
         before_action do |action, args, options|
           if Puppet::CloudPack.create_connection(options).key_pairs.get(options[:keypair]).nil?
@@ -48,6 +73,13 @@ module Puppet::CloudPack
       end
 
       action.option '--group=', '-g=', '--security-group=' do
+        summary "The instance's security group(s)."
+        description <<-EOT
+          The security group(s) that the machine will be associated with.
+          A security group determines the rules for both inbound as well as
+          outbound connections.
+          Multiple groups can be specified as a list using ':'.
+        EOT
         before_action do |action, args, options|
           options[:group] = options[:group].split(File::PATH_SEPARATOR) unless options[:group].is_a? Array
 
@@ -67,7 +99,9 @@ module Puppet::CloudPack
 
     def add_terminate_options(action)
       add_platform_option(action)
-      action.option '--force', '-f'
+      action.option '--force', '-f' do
+        summary 'Forces termination of an instance.'
+      end
     end
 
     def add_bootstrap_options(action)
@@ -77,10 +111,24 @@ module Puppet::CloudPack
 
     def add_install_options(action)
       action.option '--login=', '-l=', '--username=' do
+        summary 'User to login to the instance as.'
+        description <<-EOT
+          The name of the user to login to the instance as.
+          This should be the same user who has been configured
+          with your keypair for passwordless access.
+          This is usually the root user.
+        EOT
         required
       end
 
       action.option '--keyfile=' do
+        summary "SSH private key used to determine user's identify."
+        description <<-EOT
+          Path to the local private key that can be used to ssh into
+          the instance. If the instance was created with
+          the create action, this should be the private key
+          part of the keypair.
+        EOT
         required
         before_action do |action, arguments, options|
           unless test 'f', options[:keyfile]
@@ -93,6 +141,14 @@ module Puppet::CloudPack
       end
 
       action.option '--installer-payload=' do
+        summary 'The location of the Pupept Enterprise universal gzipped tarball'
+        description <<-EOT
+          Location of the Puppet enterprise universal tarball to be used
+          for the installation. This option is only required if Puppet
+          should be installed on the machine using this image.
+          This tarball must be zipped.
+        EOT
+        # TODO - this should not be required
         required
         before_action do |action, arguments, options|
           unless test 'f', options[:installer_payload]
@@ -108,6 +164,11 @@ module Puppet::CloudPack
       end
 
       action.option '--installer-answers=' do
+        summary 'Answers file to be used for PE installation'
+        description <<-EOT
+          Location of the answers file that should be copied to the machine
+          to install Puppet Enterprise.
+        EOT
         required
         before_action do |action, arguments, options|
           unless test 'f', options[:installer_answers]
@@ -122,6 +183,7 @@ module Puppet::CloudPack
 
     def add_classify_options(action)
       action.option '--node-group=', '--as=' do
+        summary 'The Puppet Dashboard node group to add to.'
         required
       end
     end
