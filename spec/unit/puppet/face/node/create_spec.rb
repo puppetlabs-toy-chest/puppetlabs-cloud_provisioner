@@ -23,9 +23,15 @@ describe Puppet::Face[:cloudnode, :current] do
     end
 
     describe '(platform)' do
-      it 'should require a platform' do
+      it 'should not require a platform' do
         @options.delete(:platform)
-        expect { subject.create(@options) }.to raise_error ArgumentError, /required/
+        # JJM This is absolutely not ideal, but I cannot for the life of me
+        # figure out how to effectively deal with all of the create_connection
+        # method calls in the option validation code.
+        Puppet::CloudPack.stubs(:create_connection).with() do |options|
+          raise(Exception, "#{options[:platform] == 'AWS'}")
+        end
+        expect { subject.create(@options) }.to raise_error Exception, 'true'
       end
 
       it 'should validate the platform' do
@@ -69,6 +75,20 @@ describe Puppet::Face[:cloudnode, :current] do
         @options[:keypair] = 'RejectedKeypairName'
         expect { subject.create(@options) }.to raise_error ArgumentError,
           /unrecognized.*: #{@options[:keypair]}/i
+      end
+    end
+
+    describe '(security-group)' do
+      it 'should split group names into an array' do
+        @options[:group] = %w[ A B C D E ].join(File::PATH_SEPARATOR)
+        subject.create(@options) rescue nil
+        @options[:group].should == %w[ A B C D E ]
+      end
+
+      it 'should validate all group names' do
+        @options[:group] = %w[ A B C ]
+        expect { subject.create(@options) }.to raise_error ArgumentError,
+          /unrecognized.*: #{@options[:group].join(', ')}/i
       end
     end
 
