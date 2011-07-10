@@ -46,7 +46,7 @@ describe Puppet::Face[:cloudnode, :current] do
         expect { subject.create(@options) }.to raise_error ArgumentError, /required/
       end
 
-      it 'should validate the tyoe' do
+      it 'should validate the type' do
         @options[:type] = 'UnsupportedType'
         expect { subject.create(@options) }.to raise_error ArgumentError, /one of/
       end
