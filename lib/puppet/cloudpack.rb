@@ -435,7 +435,13 @@ module Puppet::CloudPack
 
       servers = connection.servers.all('dns-name' => server)
       if servers.length == 1 || options[:force]
-        servers.each { |server| server.destroy() }
+        # We're using myserver rather than server to prevent ruby 1.8 from
+        # overwriting the server method argument
+        servers.each do |myserver|
+          print "Destroying #{myserver.id} (#{myserver.dns_name}) ..."
+          myserver.destroy()
+          puts ' Done'
+        end
       elsif servers.empty?
         Puppet.warning "Could not find server with DNS name '#{server}'"
       else
