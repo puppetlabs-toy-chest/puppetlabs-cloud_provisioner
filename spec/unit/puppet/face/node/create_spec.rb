@@ -13,7 +13,8 @@ describe Puppet::Face[:cloudnode, :current] do
       :platform => 'AWS',
       :image    => 'ami-12345',
       :type     => 'm1.small',
-      :keypair  => 'some_keypair'
+      :keypair  => 'some_keypair',
+      :region   => 'us-east-1',
     }
   end
 
@@ -105,5 +106,24 @@ describe Puppet::Face[:cloudnode, :current] do
           /unrecognized.*: #{@options[:group].join(', ')}/i
       end
     end
+
+    describe '(region)' do
+      it "should set the region to us-east-1 if no region is supplied" do
+        @options.delete(:region)
+        # JJM This is absolutely not ideal, but I cannot for the life of me
+        # figure out how to effectively deal with all of the create_connection
+        # method calls in the option validation code.
+        Puppet::CloudPack.stubs(:create_connection).with() do |options|
+          raise(Exception, "region:#{options[:region]}")
+        end
+        expect { subject.create(@options) }.to raise_error Exception, 'region:us-east-1'
+      end
+
+      it 'should validate the region' do
+        @options[:region] = 'mars-east-100'
+        expect { subject.create(@options) }.to raise_error ArgumentError, /one of/
+      end
+    end
+
   end
 end

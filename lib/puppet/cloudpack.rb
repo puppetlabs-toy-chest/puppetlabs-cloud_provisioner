@@ -4,6 +4,36 @@ require 'puppet/network/http_pool'
 
 module Puppet::CloudPack
   class << self
+
+    def add_region_option(action)
+      action.option '--region=' do
+        summary "The geographic region of the instance. Defaults to us-east-1."
+        description <<-'EOT'
+          The instance may run in any region EC2 operates within.  The regions at the
+          time of this documentation are: US East (Northern Virginia), US West (Northern
+          California), EU (Ireland), Asia Pacific (Singapore), and Asia Pacific (Tokyo).
+
+          The region names for this command are: eu-west-1, us-east-1,
+          ap-northeast-1, us-west-1, ap-southeast-1
+
+          Note: to use another region, you will need to copy your keypair and reconfigure the
+          security groups to allow SSH access.
+        EOT
+        before_action do |action, args, options|
+          # JJM FIXME We shouldn't have to set the defaults here, but we do because the first
+          # required action may not have it's #before_action evaluated yet.  As a result,
+          # the default settings may not be evaluated.
+          options[:platform] ||= 'AWS'
+          options[:region] ||= 'us-east-1'
+          regions_response = Puppet::CloudPack.create_connection(options).describe_regions
+          region_names = regions_response.body["regionInfo"].collect { |r| r["regionName"] }.flatten
+          unless region_names.include?(options[:region])
+            raise ArgumentError, "Region must be one of the following: #{region_names.join(', ')}"
+          end
+        end
+      end
+    end
+
     def add_platform_option(action)
       action.option '--platform=' do
         summary 'Platform used to create machine instance (only supports AWS).'
@@ -22,6 +52,7 @@ module Puppet::CloudPack
 
     def add_create_options(action)
       add_platform_option(action)
+      add_region_option(action)
 
       action.option '--image=', '-i=' do
         summary 'AMI to use when creating the instance.'
@@ -32,9 +63,10 @@ module Puppet::CloudPack
         EOT
         required
         before_action do |action, args, options|
-          # We add this option because it's required in Fog but optional for Cloud Pack
+          # We add these options because it's required in Fog but optional for Cloud Pack
           # It doesn't feel right to do this here, but I don't know another way yet.
           options[:platform] ||= 'AWS'
+          options[:region] ||= 'us-east-1'
           if Puppet::CloudPack.create_connection(options).images.get(options[:image]).nil?
             raise ArgumentError, "Unrecognized image name: #{options[:image]}"
           end
@@ -98,6 +130,7 @@ module Puppet::CloudPack
           end
         end
       end
+
     end
 
     def add_init_options(action)
@@ -106,6 +139,7 @@ module Puppet::CloudPack
     end
 
     def add_terminate_options(action)
+      add_region_option(action)
       add_platform_option(action)
       action.option '--force', '-f' do
         summary 'Forces termination of an instance.'
@@ -249,10 +283,10 @@ module Puppet::CloudPack
         options[:_destroy_server_at_exit] = :create
       end
 
-      print "Connecting to #{options[:platform]} ..."
+      print "Connecting to #{options[:platform]} #{options[:region]}"
       connection = create_connection(options)
       puts ' Done'
-      puts "#{options[:type]}"
+      puts "Instance Type: #{options[:type]}"
 
       # TODO: Validate that the security groups permit SSH access from here.
       # TODO: Can this throw errors?
@@ -394,6 +428,7 @@ module Puppet::CloudPack
       # JJM This isn't ideal, it would be better to set the default in the
       # option handling block, but I'm not sure how to do this.
       options[:platform] ||= 'AWS'
+      options[:region] ||= 'us-east-1'
       print "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
       puts ' Done'
@@ -410,9 +445,17 @@ module Puppet::CloudPack
       return nil
     end
 
-
     def create_connection(options = {})
-      Fog::Compute.new(:provider => options[:platform])
+      # We don't support more than AWS, but this satisfies the rspec tests
+      # that pass in a provider string that does not match 'AWS'.  This makes
+      # the test pass by preventing Fog from throwing an error when the region
+      # option is not expected
+      case options[:platform]
+      when 'AWS'
+        Fog::Compute.new(:provider => options[:platform], :region => options[:region])
+      else
+        Fog::Compute.new(:provider => options[:platform])
+      end
     end
 
     def create_server(servers, options = {})
