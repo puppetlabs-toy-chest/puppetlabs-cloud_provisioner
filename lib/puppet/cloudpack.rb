@@ -139,6 +139,11 @@ module Puppet::CloudPack
 
     end
 
+    def add_list_options(action)
+      add_platform_option(action)
+      add_region_option(action)
+    end
+
     def add_init_options(action)
       add_install_options(action)
       add_classify_options(action)
@@ -348,6 +353,15 @@ module Puppet::CloudPack
       end
 
       return server.dns_name
+    end
+
+    def list(options)
+      options = merge_default_options(options)
+      connection = create_connection(options)
+      servers = connection.servers
+      # Convert the Fog object into a simple array.
+      # And return the array to the Faces API for rendering
+      servers.collect { |i| i.dns_name }
     end
 
     def init(server, options)
