@@ -5,6 +5,14 @@ require 'puppet/network/http_pool'
 module Puppet::CloudPack
   class << self
 
+    # Method to set AWS defaults in a central place.  Lots of things need these
+    # defaults, so they all call merge_default_options() to ensure the keys are
+    # set.
+    def merge_default_options(options)
+      default_options = { :region => 'us-east-1', :platform => 'AWS' }
+      default_options.merge(options)
+    end
+
     def add_region_option(action)
       action.option '--region=' do
         summary "The geographic region of the instance. Defaults to us-east-1."
@@ -23,8 +31,8 @@ module Puppet::CloudPack
           # JJM FIXME We shouldn't have to set the defaults here, but we do because the first
           # required action may not have it's #before_action evaluated yet.  As a result,
           # the default settings may not be evaluated.
-          options[:platform] ||= 'AWS'
-          options[:region] ||= 'us-east-1'
+          options = Puppet::CloudPack.merge_default_options(options)
+
           regions_response = Puppet::CloudPack.create_connection(options).describe_regions
           region_names = regions_response.body["regionInfo"].collect { |r| r["regionName"] }.flatten
           unless region_names.include?(options[:region])
@@ -65,8 +73,7 @@ module Puppet::CloudPack
         before_action do |action, args, options|
           # We add these options because it's required in Fog but optional for Cloud Pack
           # It doesn't feel right to do this here, but I don't know another way yet.
-          options[:platform] ||= 'AWS'
-          options[:region] ||= 'us-east-1'
+          options = Puppet::CloudPack.merge_default_options(options)
           if Puppet::CloudPack.create_connection(options).images.get(options[:image]).nil?
             raise ArgumentError, "Unrecognized image name: #{options[:image]}"
           end
@@ -102,7 +109,7 @@ module Puppet::CloudPack
         before_action do |action, args, options|
           # We add this option because it's required in Fog but optional for Cloud Pack
           # It doesn't feel right to do this here, but I don't know another way yet.
-          options[:platform] ||= 'AWS'
+          options = Puppet::CloudPack.merge_default_options(options)
           if Puppet::CloudPack.create_connection(options).key_pairs.get(options[:keypair]).nil?
             raise ArgumentError, "Unrecognized keypair name: #{options[:keypair]}"
           end
@@ -118,10 +125,9 @@ module Puppet::CloudPack
           Multiple groups can be specified as a list using ':'.
         EOT
         before_action do |action, args, options|
-          # We add this option because it's required in Fog but optional for Cloud Pack
-          # It doesn't feel right to do this here, but I don't know another way yet.
-          options[:platform] ||= 'AWS'
           options[:group] = options[:group].split(File::PATH_SEPARATOR) unless options[:group].is_a? Array
+
+          options = Puppet::CloudPack.merge_default_options(options)
 
           known = Puppet::CloudPack.create_connection(options).security_groups
           unknown = options[:group].select { |g| known.get(g).nil? }
@@ -279,6 +285,7 @@ module Puppet::CloudPack
     end
 
     def create(options)
+      options = merge_default_options(options)
       unless options.has_key? :_destroy_server_at_exit
         options[:_destroy_server_at_exit] = :create
       end
@@ -427,8 +434,8 @@ module Puppet::CloudPack
     def terminate(server, options)
       # JJM This isn't ideal, it would be better to set the default in the
       # option handling block, but I'm not sure how to do this.
-      options[:platform] ||= 'AWS'
-      options[:region] ||= 'us-east-1'
+      options = merge_default_options(options)
+
       print "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
       puts ' Done'
