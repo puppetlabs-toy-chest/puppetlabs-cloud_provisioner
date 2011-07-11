@@ -484,6 +484,12 @@ module Puppet::CloudPack
       login    = options[:login]
       keyfile  = options[:keyfile]
 
+      if options[:install_script] == 'puppet-enterprise'
+        unless options[:installer_payload] and options[:installer_answers]
+          raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
+        end
+      end
+
       if not test('f', '/usr/bin/uuidgen')
         raise "/usr/bin/uuidgen does not exist; please install uuidgen."
       elsif not test('x', '/usr/bin/uuidgen')
