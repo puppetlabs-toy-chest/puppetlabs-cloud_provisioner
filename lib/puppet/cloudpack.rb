@@ -1,8 +1,10 @@
+require 'tempfile'
 require 'rubygems'
 require 'fog'
 require 'puppet/network/http_pool'
 
 module Puppet::CloudPack
+  require 'puppet/cloudpack/installer'
   class << self
 
     # Method to set AWS defaults in a central place.  Lots of things need these
@@ -279,7 +281,6 @@ module Puppet::CloudPack
           mode.
         EOT
         before_action do |action, arguments, options|
-          puts 'foo'
           unless options[:facter_version] =~ /\d+\.\d+\.\d+/
             raise ArgumentError, "Invaid Facter version '#{options[:facter_version]}'"
           end
@@ -482,7 +483,7 @@ module Puppet::CloudPack
 
     def install(server, options)
       login    = options[:login]
-      keyfile  = options[:keyfile]
+      keyfile  = File.expand_path(options[:keyfile])
 
       if options[:install_script] == 'puppet-enterprise'
         unless options[:installer_payload] and options[:installer_answers]
@@ -527,22 +528,51 @@ module Puppet::CloudPack
       end
       Puppet.notice "Waiting for SSH response ... Done"
 
-      Puppet.notice "Uploading Puppet ..."
-      scp.upload(options[:installer_payload], '/tmp/puppet.tar.gz')
-      Puppet.notice "Uploading Puppet ... Done"
+      # I had a craft this command b/c I noticed that mktemp does not behave
+      # consistently between mac and linux
+      tmp_dir = ssh.run('bash -c "mktemp -d /tmp/installer_script.$(echo $RANDOM)"')[0].stdout.chomp
 
-      Puppet.notice "Uploading Puppet Answer File ..."
-      scp.upload(options[:installer_answers], '/tmp/puppet.answers')
-      Puppet.notice "Uploading Puppet Answer File ... Done"
+      if options[:installer_payload]
+        Puppet.notice "Uploading Puppet Enterprise tarball ..."
+        scp.upload(options[:installer_payload], "#{tmp_dir}/puppet.tar.gz")
+        Puppet.notice "Uploading Puppet Enterprise tarball ... Done"
+      end
+
+      if options[:installer_answers]
+        Puppet.info "Uploading Puppet Answer File ..."
+        scp.upload(options[:installer_answers], "#{tmp_dir}/puppet.answers")
+        Puppet.info "Uploading Puppet Answer File ... Done"
+      end
 
       Puppet.notice "Installing Puppet ..."
-      steps = [
-        'tar -xvzf /tmp/puppet.tar.gz -C /tmp',
-        %Q[echo "q_puppetagent_certname='#{ certname }'" >> /tmp/puppet.answers],
-        '/tmp/puppet-enterprise-1.0-all/puppet-enterprise-installer -a /tmp/puppet.answers &> /tmp/install.log'
-      ]
-      ssh.run(steps.map { |c| login == 'root' ? c : "sudo #{c}" })
-      Puppet.notice "Installing Puppet ... Done"
+      options[:certname] = certname
+      options[:tmp_dir] = tmp_dir
+      options[:server] = Puppet[:server]
+      options[:environment] = Puppet[:environment] || 'production'
+
+      script   = options[:install_script] || 'foss'
+      install_script = Puppet::CloudPack::Installer.build_installer_template(script, options)
+      Puppet.debug("Compiled installation script:")
+      Puppet.debug(install_script)
+      tmp_install_script = Tempfile.new('install_script').path
+      File.open(tmp_install_script, 'w') do |fh|
+        fh.write(install_script)
+      end
+
+      Puppet.notice "Executing Puppet Install Script ..."
+
+      scp.upload(tmp_install_script, "#{tmp_dir}/#{script}.sh")
+      cmd = "bash -c 'chmod u+x #{tmp_dir}/#{script}.sh; #{tmp_dir}/#{script}.sh | tee #{tmp_dir}/install.log'"
+      result = ssh.run(login == 'root' ? cmd : "sudo #{cmd}" )
+      stdout = result[0].stdout
+      stderr = result[0].stderr
+      stdout.each_line do |r|
+        Puppet.debug(r)
+      end
+      stderr.each_line do |r|
+        Puppet.debug(r)
+      end
+      Puppet.notice "Executing Puppet Install Script ... Done"
 
       return certname
     end
