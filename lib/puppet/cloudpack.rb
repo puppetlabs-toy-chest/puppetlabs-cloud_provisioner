@@ -206,8 +206,6 @@ module Puppet::CloudPack
           should be installed on the machine using this image.
           This tarball must be zipped.
         EOT
-        # TODO - this should not be required
-        required
         before_action do |action, arguments, options|
           options[:installer_payload] = File.expand_path(options[:installer_payload])
           unless test 'f', options[:installer_payload]
@@ -228,7 +226,6 @@ module Puppet::CloudPack
           Location of the answers file that should be copied to the machine
           to install Puppet Enterprise.
         EOT
-        required
         before_action do |action, arguments, options|
           options[:installer_answers] = File.expand_path(options[:installer_answers])
           unless test 'f', options[:installer_answers]
