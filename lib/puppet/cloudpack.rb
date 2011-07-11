@@ -309,6 +309,9 @@ module Puppet::CloudPack
         :flavor_id  => options[:type]
       )
 
+      # This is the earliest point we have knowledge of the instance ID
+      puts "Instance identifier: #{server.id}"
+
       Signal.trap(:EXIT) do
         if options[:_destroy_server_at_exit]
           server.destroy rescue nil
@@ -331,6 +334,9 @@ module Puppet::CloudPack
         Puppet.err "Please check your network connection and try again"
         return nil
       end
+
+      # This is the earliest point we have knowledge of the DNS name
+      puts "Instance public dns name: #{server.dns_name}"
 
       # TODO: Find a better way of getting the Fingerprints
       begin
