@@ -1,0 +1,40 @@
+#!/bin/bash
+# This script is intended to be used with the install action
+# of puppet-cloudpack
+set -u
+set -e
+if [ -f /etc/redhat-release ]; then
+  cat >/etc/yum.repos.d/epel.repo <<EOF
+[prosvc]
+name=Puppet Labs PS (Unofficial)
+baseurl=http://yum.puppetlabs.com/prosvc/5/\$basearch
+enabled=1
+gpgkey=http://yum.puppetlabs.com/prosvc/RPM-GPG-KEY-prosvc
+gpgcheck=1
+EOF
+  yum install -y ruby rubygems
+elif [ -f /etc/debian_version ]; then
+  apt-get install ruby rubygems
+fi
+gem install facter <% if options[:facter_version] %>-v<%= options[:facter_version] %><% end %> --no-ri --no-rdoc
+gem install puppet <% if options[:puppet_version] %>-v<%= options[:puppet_version] %><% end %> --no-ri --no-rdoc
+mkdir -p /etc/puppet /var/lib /var/log /var/run
+cat >/etc/puppet/puppet.conf <<EOF
+[main]
+  logdir = /var/log/puppet
+  rundir = /var/run/puppet
+  ssldir = \$vardir/ssl
+  vardir = /var/lib/puppet
+
+  pluginsync = true
+
+  server = <%= options[:server] %>
+
+  environment = <%= options[:environment] %>
+  certname = <%= options[:certname] %>
+  report = true
+EOF
+
+export PATH="$PATH:/var/lib/gems/1.8/bin"
+cd <%= options[:tmp_dir] %>
+puppet agent --test >& puppet_agent.log
