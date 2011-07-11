@@ -236,6 +236,56 @@ module Puppet::CloudPack
           end
         end
       end
+
+      action.option '--install-script=' do
+        summary 'Name of the template to use for installation'
+        description <<-EOT
+          Name of the template to use for installation. The current
+          list of supported templates is: foss, puppet-enterprise
+        EOT
+      end
+
+      action.option '--puppet-version=' do
+        summary 'version of Puppet to install'
+        description <<-EOT
+          Version of Puppet to be installed. This version is
+          passed to the Puppet installer script.
+        EOT
+        before_action do |action, arguments, options|
+          unless options[:puppet_version] =~ /^(\d+)\.(\d+)(\.(\d+))?$|^(\d)+\.(\d)+\.(\d+)([a-zA-Z][a-zA-Z0-9-]*)$/
+            raise ArgumentError, "Invaid Puppet version '#{options[:puppet_version]}'"
+          end
+        end
+      end
+
+      action.option '--pe-version=' do
+        summary 'version of Puppet Enterprise to install'
+        description <<-EOT
+          Version of Puppet Enterprise to be passed to the installer script.
+          Defaults to 1.1.
+        EOT
+        before_action do |action, arguments, options|
+          unless options[:pe_version] =~ /^(\d+)\.(\d+)(\.(\d+))?$|^(\d)+\.(\d)+\.(\d+)([a-zA-Z][a-zA-Z0-9-]*)$/
+            raise ArgumentError, "Invaid Puppet Enterprise version '#{options[:pe_version]}'"
+          end
+        end
+      end
+
+      action.option '--facter-version=' do
+        summary 'version of facter to install'
+        description <<-EOT
+          The version of facter that should be installed.
+          This only makes sense in open source installation
+          mode.
+        EOT
+        before_action do |action, arguments, options|
+          puts 'foo'
+          unless options[:facter_version] =~ /\d+\.\d+\.\d+/
+            raise ArgumentError, "Invaid Facter version '#{options[:facter_version]}'"
+          end
+        end
+      end
+
     end
 
     def add_classify_options(action)
