@@ -252,7 +252,7 @@ module Puppet::CloudPack
     end
 
     def classify(certname, options)
-      puts "Using http://#{Puppet[:report_server]}:#{Puppet[:report_port]} as Dashboard."
+      Puppet.info "Using http://#{Puppet[:report_server]}:#{Puppet[:report_port]} as Dashboard."
       http = Puppet::Network::HttpPool.http_instance(Puppet[:report_server], Puppet[:report_port])
 
       # Workaround for the fact that Dashboard is typically insecure.
@@ -260,27 +260,27 @@ module Puppet::CloudPack
       headers = { 'Content-Type' => 'application/json' }
 
       begin
-        print 'Registering node ...'
+        Puppet.notice 'Registering node ...'
         data = { 'node' => { 'name' => certname } }
         response = http.post('/nodes.json', data.to_pson, headers)
         if (response.code == '201')
-          puts ' Done'
+          Puppet.notice 'Registering node ... Done'
         else
-          puts ' Failed'
+          Puppet.warning 'Registering node ... Failed'
           Puppet.warning "Server responded with a #{response.code} status"
         end
 
-        print 'Classifying node ...'
+        Puppet.notice 'Classifying node ...'
         data = { 'node_name' => certname, 'group_name' => options[:node_group] }
         response = http.post("/memberships.json", data.to_pson, headers)
         if (response.code == '201')
-          puts ' Done'
+          Puppet.notice 'Classifying node ... Done'
         else
-          puts ' Failed'
+          Puppet.warning 'Classifying node ... Failed'
           Puppet.warning "Server responded with a #{response.code} status"
         end
       rescue Errno::ECONNREFUSED
-        puts ' Error'
+        Puppet.warning 'Registering node ... Error'
         Puppet.err "Could not connect to host http://#{Puppet[:report_server]}:#{Puppet[:report_port]}"
         Puppet.err "Check your report_server and report_port options"
         exit(1)
@@ -295,10 +295,10 @@ module Puppet::CloudPack
         options[:_destroy_server_at_exit] = :create
       end
 
-      print "Connecting to #{options[:platform]} #{options[:region]}"
+      Puppet.info("Connecting to #{options[:platform]} #{options[:region]} ...")
       connection = create_connection(options)
-      puts ' Done'
-      puts "Instance Type: #{options[:type]}"
+      Puppet.info("Connecting to #{options[:platform]} #{options[:region]} ... Done")
+      Puppet.info("Instance Type: #{options[:type]}")
 
       # TODO: Validate that the security groups permit SSH access from here.
       # TODO: Can this throw errors?
@@ -310,46 +310,47 @@ module Puppet::CloudPack
       )
 
       # This is the earliest point we have knowledge of the instance ID
-      puts "Instance identifier: #{server.id}"
+      Puppet.info("Instance identifier: #{server.id}")
 
       Signal.trap(:EXIT) do
         if options[:_destroy_server_at_exit]
           server.destroy rescue nil
+          Puppet.err("Destroyed server #{server.id} because of an abnormal exit")
         end
       end
 
       create_tags(connection.tags, server)
 
-      print 'Starting up '
+      Puppet.notice("Launching server #{server.id} ...")
       retries = 0
       begin
         server.wait_for do
-          print '.'
+          Puppet.info("Waiting for server #{server.id} to become ready ...")
           self.ready?
         end
-        puts ' Done'
+        Puppet.notice("Server #{server.id} is launched")
       rescue Fog::Errors::Error
-        puts "Failed"
+        Puppet.err "Launching server #{server.id} Failed."
         Puppet.err "Could not connect to host"
         Puppet.err "Please check your network connection and try again"
         return nil
       end
 
       # This is the earliest point we have knowledge of the DNS name
-      puts "Instance public dns name: #{server.dns_name}"
+      Puppet.notice("Server #{server.id} public dns name: #{server.dns_name}")
 
       # TODO: Find a better way of getting the Fingerprints
       begin
-        print 'Waiting for host fingerprints '
+        Puppet.notice("Waiting for SSH host key fingerprint from #{options[:platform]} ...")
         Fog.wait_for do
-          print '.'
+          Puppet.notice("Still waiting for SSH host key fingerprint from #{options[:platform]} ...")
           not server.console_output.body['output'].nil?
         end or raise Fog::Errors::Error, "Waiting for host fingerprints timed out"
-        puts ' Done'
-
-        puts *server.console_output.body['output'].grep(/^ec2:/)
+        Puppet.notice("Waiting for SSH host key fingerprint from #{options[:platform]} ... Done")
+        # FIXME Where is the fingerprint?  Do we output it ever?
+        # puts *server.console_output.body['output'].grep(/^ec2:/)
       rescue Fog::Errors::Error => e
-        puts "Failed"
+        Puppet.warning("Waiting for SSH host key fingerprint from #{options[:platform]} ... Failed")
         Puppet.warning "Could not read the host's fingerprints"
         Puppet.warning "Please verify the host's fingerprints through AWS"
       end
@@ -374,7 +375,7 @@ module Puppet::CloudPack
       certname = install(server, options)
       options.delete(:_destroy_server_at_exit)
 
-      puts "Puppet Enterprise is now installed on: #{server}"
+      Puppet.notice "Puppet Enterprise is now installed on: #{server}"
 
       classify(certname, options)
 
@@ -383,16 +384,20 @@ module Puppet::CloudPack
 
       # TODO: Wait for C.S.R.?
 
-      print "Signing certificate ..."
+      Puppet.notice "Signing certificate ..."
       begin
         Puppet::Face[:certificate, '0.0.1'].sign(certname, opts)
-        puts " Done"
+        Puppet.notice "Signing certificate ... Done"
       rescue Puppet::Error => e
         # TODO: Write useful next steps.
-        puts " Failed"
+        Puppet.err "Signing certificate ... Failed"
+        Puppet.err "Signing certificate error: #{e}"
+        exit(1)
       rescue Net::HTTPError => e
         # TODO: Write useful next steps
-        puts " Failed"
+        Puppet.warning "Signing certificate ... Failed"
+        Puppet.err "Signing certificate error: #{e}"
+        exit(1)
       end
     end
 
@@ -413,40 +418,39 @@ module Puppet::CloudPack
       ssh = Fog::SSH.new(server, login, opts)
       scp = Fog::SCP.new(server, login, opts)
 
-      print "Waiting for SSH response ..."
+      Puppet.notice "Waiting for SSH response ..."
       retries = 0
       begin
         # TODO: Certain cases cause this to hang?
         ssh.run(['hostname'])
       rescue Net::SSH::AuthenticationFailed
-        puts " Failed"
+        Puppet.err "Waiting for SSH response ... Failed"
         raise "Check your authentication credentials and try again."
       rescue => e
         sleep 5
         retries += 1
-        print '.'
-        puts " Failed"
+        Puppet.notice "Still waiting for SSH response ... (Retry #{retries})"
         raise "SSH not responding; aborting." if retries > 60
         retry
       end
-      puts " Done"
+      Puppet.notice "Waiting for SSH response ... Done"
 
-      print "Uploading Puppet ..."
+      Puppet.notice "Uploading Puppet ..."
       scp.upload(options[:installer_payload], '/tmp/puppet.tar.gz')
-      puts " Done"
+      Puppet.notice "Uploading Puppet ... Done"
 
-      print "Uploading Puppet Answer File ..."
+      Puppet.notice "Uploading Puppet Answer File ..."
       scp.upload(options[:installer_answers], '/tmp/puppet.answers')
-      puts " Done"
+      Puppet.notice "Uploading Puppet Answer File ... Done"
 
-      print "Installing Puppet ..."
+      Puppet.notice "Installing Puppet ..."
       steps = [
         'tar -xvzf /tmp/puppet.tar.gz -C /tmp',
         %Q[echo "q_puppetagent_certname='#{ certname }'" >> /tmp/puppet.answers],
         '/tmp/puppet-enterprise-1.0-all/puppet-enterprise-installer -a /tmp/puppet.answers &> /tmp/install.log'
       ]
       ssh.run(steps.map { |c| login == 'root' ? c : "sudo #{c}" })
-      puts " Done"
+      Puppet.notice "Installing Puppet ... Done"
 
       return certname
     end
@@ -456,18 +460,18 @@ module Puppet::CloudPack
       # option handling block, but I'm not sure how to do this.
       options = merge_default_options(options)
 
-      print "Connecting to #{options[:platform]} ..."
+      Puppet.info "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
-      puts ' Done'
+      Puppet.info "Connecting to #{options[:platform]} ... Done"
 
       servers = connection.servers.all('dns-name' => server)
       if servers.length == 1 || options[:force]
         # We're using myserver rather than server to prevent ruby 1.8 from
         # overwriting the server method argument
         servers.each do |myserver|
-          print "Destroying #{myserver.id} (#{myserver.dns_name}) ..."
+          Puppet.notice "Destroying #{myserver.id} (#{myserver.dns_name}) ..."
           myserver.destroy()
-          puts ' Done'
+          Puppet.notice "Destroying #{myserver.id} (#{myserver.dns_name}) ... Done"
         end
       elsif servers.empty?
         Puppet.warning "Could not find server with DNS name '#{server}'"
@@ -492,20 +496,20 @@ module Puppet::CloudPack
     end
 
     def create_server(servers, options = {})
-      print 'Creating new instance ...'
+      Puppet.notice('Creating new instance ...')
       server = servers.create(options)
-      puts ' Done'
+      Puppet.notice("Creating new instance ... Done")
       return server
     end
 
     def create_tags(tags, server)
-      print 'Creating tags for instance ...'
+      Puppet.notice('Creating tags for instance ...')
       tags.create(
         :key         => 'Created-By',
         :value       => 'Puppet',
         :resource_id => server.id
       )
-      puts ' Done'
+      Puppet.notice('Creating tags for instance ... Done')
     end
   end
 end
