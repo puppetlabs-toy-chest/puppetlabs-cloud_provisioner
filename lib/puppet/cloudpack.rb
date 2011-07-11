@@ -188,11 +188,12 @@ module Puppet::CloudPack
         EOT
         required
         before_action do |action, arguments, options|
-          unless test 'f', options[:keyfile]
-            raise ArgumentError, "Could not find file '#{options[:keyfile]}'"
+          keyfile = File.expand_path(options[:keyfile])
+          unless test 'f', keyfile
+            raise ArgumentError, "Could not find file '#{keyfile}'"
           end
-          unless test 'r', options[:keyfile]
-            raise ArgumentError, "Could not read from file '#{options[:keyfile]}'"
+          unless test 'r', keyfile
+            raise ArgumentError, "Could not read from file '#{keyfile}'"
           end
         end
       end
@@ -208,6 +209,7 @@ module Puppet::CloudPack
         # TODO - this should not be required
         required
         before_action do |action, arguments, options|
+          options[:installer_payload] = File.expand_path(options[:installer_payload])
           unless test 'f', options[:installer_payload]
             raise ArgumentError, "Could not find file '#{options[:installer_payload]}'"
           end
@@ -228,6 +230,7 @@ module Puppet::CloudPack
         EOT
         required
         before_action do |action, arguments, options|
+          options[:installer_answers] = File.expand_path(options[:installer_answers])
           unless test 'f', options[:installer_answers]
             raise ArgumentError, "Could not find file '#{options[:installer_answers]}'"
           end
