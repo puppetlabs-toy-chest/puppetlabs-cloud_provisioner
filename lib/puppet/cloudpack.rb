@@ -136,7 +136,6 @@ module Puppet::CloudPack
           end
         end
       end
-
     end
 
     def add_list_options(action)
