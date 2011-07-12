@@ -11,7 +11,6 @@ module Puppet::CloudPack
           The Cloud platform used to create new machine instances.
           Currently, AWS (Amazon Web Services) is the only supported platform.
         EOT
-        required
         before_action do |action, args, options|
           supported_platforms = [ 'AWS' ]
           unless supported_platforms.include?(options[:platform])
@@ -33,6 +32,9 @@ module Puppet::CloudPack
         EOT
         required
         before_action do |action, args, options|
+          # We add this option because it's required in Fog but optional for Cloud Pack
+          # It doesn't feel right to do this here, but I don't know another way yet.
+          options[:platform] ||= 'AWS'
           if Puppet::CloudPack.create_connection(options).images.get(options[:image]).nil?
             raise ArgumentError, "Unrecognized image name: #{options[:image]}"
           end
@@ -66,6 +68,9 @@ module Puppet::CloudPack
         EOT
         required
         before_action do |action, args, options|
+          # We add this option because it's required in Fog but optional for Cloud Pack
+          # It doesn't feel right to do this here, but I don't know another way yet.
+          options[:platform] ||= 'AWS'
           if Puppet::CloudPack.create_connection(options).key_pairs.get(options[:keypair]).nil?
             raise ArgumentError, "Unrecognized keypair name: #{options[:keypair]}"
           end
@@ -81,6 +86,9 @@ module Puppet::CloudPack
           Multiple groups can be specified as a list using ':'.
         EOT
         before_action do |action, args, options|
+          # We add this option because it's required in Fog but optional for Cloud Pack
+          # It doesn't feel right to do this here, but I don't know another way yet.
+          options[:platform] ||= 'AWS'
           options[:group] = options[:group].split(File::PATH_SEPARATOR) unless options[:group].is_a? Array
 
           known = Puppet::CloudPack.create_connection(options).security_groups
@@ -383,6 +391,9 @@ module Puppet::CloudPack
     end
 
     def terminate(server, options)
+      # JJM This isn't ideal, it would be better to set the default in the
+      # option handling block, but I'm not sure how to do this.
+      options[:platform] ||= 'AWS'
       print "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
       puts ' Done'
