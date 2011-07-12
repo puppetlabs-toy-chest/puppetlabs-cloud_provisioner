@@ -143,6 +143,11 @@ module Puppet::CloudPack
       add_region_option(action)
     end
 
+    def add_fingerprint_options(action)
+      add_platform_option(action)
+      add_region_option(action)
+    end
+
     def add_init_options(action)
       add_install_options(action)
       add_classify_options(action)
@@ -327,6 +332,7 @@ module Puppet::CloudPack
           print '#'
           self.ready?
         end
+        puts
         Puppet.notice("Server #{server.id} is now launched")
       rescue Fog::Errors::Error
         Puppet.err "Launching server #{server.id} Failed."
@@ -337,23 +343,6 @@ module Puppet::CloudPack
 
       # This is the earliest point we have knowledge of the DNS name
       Puppet.notice("Server #{server.id} public dns name: #{server.dns_name}")
-
-      # TODO: Find a better way of getting the Fingerprints
-      begin
-        Puppet.notice("Waiting for SSH host key fingerprint from #{options[:platform]} ...")
-        Fog.wait_for do
-          print "#"
-          not server.console_output.body['output'].nil?
-        end or raise Fog::Errors::Error, "Waiting for host fingerprints timed out"
-        puts
-        Puppet.notice("Waiting for SSH host key fingerprint from #{options[:platform]} ... Done")
-        # FIXME Where is the fingerprint?  Do we output it ever?
-        # puts *server.console_output.body['output'].grep(/^ec2:/)
-      rescue Fog::Errors::Error => e
-        Puppet.warning("Waiting for SSH host key fingerprint from #{options[:platform]} ... Failed")
-        Puppet.warning "Could not read the host's fingerprints"
-        Puppet.warning "Please verify the host's fingerprints through AWS"
-      end
 
       if options[:_destroy_server_at_exit] == :create
         options.delete(:_destroy_server_at_exit)
@@ -369,6 +358,46 @@ module Puppet::CloudPack
       # Convert the Fog object into a simple array.
       # And return the array to the Faces API for rendering
       servers.collect { |i| i.dns_name }
+    end
+
+    def fingerprint(server, options)
+      options = merge_default_options(options)
+      connection = create_connection(options)
+      servers = connection.servers.all('dns-name' => server)
+
+      # Our hash for output.  We'll collect into this data structure.
+      output_hash = {}
+      output_array = servers.collect do |myserver|
+        # TODO: Find a better way of getting the Fingerprints
+        # The current method scrapes the AWS console looking for an ^ec2: pattern
+        # This is not robust or ideal.  We make a "best effort" to find the fingerprint
+        begin
+          # Is there any console output yet?
+          if myserver.console_output.body['output'].nil? then
+            Puppet.info("Waiting for instance console output to become available ...")
+            Fog.wait_for do
+              print "#"
+              not myserver.console_output.body['output'].nil?
+            end or raise Fog::Errors::Error, "Waiting for console output timed out"
+            puts "# Console output is ready"
+          end
+          # FIXME Where is the fingerprint?  Do we output it ever?
+          { "#{myserver.id}" => myserver.console_output.body['output'].grep(/^ec2:/) }
+        rescue Fog::Errors::Error => e
+          Puppet.warning("Waiting for SSH host key fingerprint from #{options[:platform]} ... Failed")
+          Puppet.warning "Could not read the host's fingerprints"
+          Puppet.warning "Please verify the host's fingerprints through the AWS console output"
+        end
+      end
+      output_array.each { |hsh| output_hash = hsh.merge(output_hash) }
+      # Check to see if we got anything back
+      if output_hash.collect { |k,v| v }.flatten.empty? then
+        Puppet.warning "We could not securely find a fingerprint because the image did not print the fingerprint to the console."
+        Puppet.warning "Please use an AMI that prints the fingerprint to the console in order to connect to the instance more securely."
+        Puppet.info "The system is ready.  Please add the host key to your known hosts file."
+        Puppet.info "For example: ssh root@#{server} and respond yes."
+      end
+      output_hash
     end
 
     def init(server, options)

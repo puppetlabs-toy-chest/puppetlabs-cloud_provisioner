@@ -4,8 +4,11 @@ Puppet::Face.define :cloudnode, '0.0.1' do
   action :create do
     summary 'Create a new EC2 machine instance.'
     description <<-EOT
-      Creates a new EC2 machine instance, prints its
-      SSH host key fingerprints, and returns its DNS name.
+      This action launches a new Amazon EC2 instance and returns
+      the public DNS name suitable for SSH access.  The system
+      may not be immediately ready after launch while it boots.
+      Please use the fingerprint action to wait for the system
+      to become ready after launch.
       If the process fails, Puppet will automatically clean
       up after itself and tear down the instance.
     EOT
