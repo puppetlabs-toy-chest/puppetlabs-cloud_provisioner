@@ -1,6 +1,6 @@
 require 'puppet/cloudpack'
 
-Puppet::Face.define :cloudnode, '0.0.1' do
+Puppet::Face.define :node, '0.0.1' do
   action :fingerprint do
     summary 'Make a best effort to securely obtain the SSH host key fingerprint'
     description <<-EOT
