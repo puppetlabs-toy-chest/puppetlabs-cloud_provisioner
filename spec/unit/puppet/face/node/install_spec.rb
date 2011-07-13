@@ -2,7 +2,7 @@ require 'spec_helper'
 require 'puppet/cloudpack'
 require 'tempfile'
 
-describe Puppet::Face[:cloudnode, :current] do
+describe Puppet::Face[:node, :current] do
   before :each do
     @options = {
       :login             => 'ubuntu',
