@@ -1,5 +1,6 @@
 require 'tempfile'
 require 'rubygems'
+require 'guid'
 require 'fog'
 require 'puppet/network/http_pool'
 
@@ -491,12 +492,8 @@ module Puppet::CloudPack
         end
       end
 
-      if not test('f', '/usr/bin/uuidgen')
-        raise "/usr/bin/uuidgen does not exist; please install uuidgen."
-      elsif not test('x', '/usr/bin/uuidgen')
-        raise "/usr/bin/uuidgen is not executable; please change that file's permissions."
-      end
-      certname = `/usr/bin/uuidgen`.downcase.chomp
+      # This requires the "guid" gem
+      certname = Guid.new.to_s
 
       opts = {}
       opts[:key_data] = [File.read(keyfile)] if keyfile
