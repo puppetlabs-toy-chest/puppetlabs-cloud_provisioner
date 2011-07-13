@@ -528,9 +528,8 @@ module Puppet::CloudPack
       end
       Puppet.notice "Waiting for SSH response ... Done"
 
-      # I had a craft this command b/c I noticed that mktemp does not behave
-      # consistently between mac and linux
-      tmp_dir = ssh.run('bash -c "mktemp -d /tmp/installer_script.$(echo $RANDOM)"')[0].stdout.chomp
+      # command for creating cross-ditro tmp dirs
+      tmp_dir = ssh.run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
 
       if options[:installer_payload]
         Puppet.notice "Uploading Puppet Enterprise tarball ..."
