@@ -452,9 +452,16 @@ module Puppet::CloudPack
       begin
         # TODO: Certain cases cause this to hang?
         ssh.run(['hostname'])
-      rescue Net::SSH::AuthenticationFailed
-        Puppet.err "Waiting for SSH response ... Failed"
-        raise "Check your authentication credentials and try again."
+      rescue Net::SSH::AuthenticationFailed => e
+        Puppet.info "Got an SSH authentication failure (Retry #{retries}), this may because the machine is booting. (Sleeping for 5 seconds)"
+        sleep 5
+        retries += 1
+        if retries > 10
+          Puppet.err "Could not connect via SSH.  The error is: #{e}"
+          Puppet.err "This may be a result of the SSH public key for key #{options[:keyfile]} not being installed into the authorized_keys file of the remote login account."
+          raise Puppet::Error, "Check your authentication credentials and try again."
+        end
+        retry
       rescue => e
         sleep 5
         retries += 1
