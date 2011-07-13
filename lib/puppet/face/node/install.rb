@@ -1,6 +1,6 @@
 require 'puppet/cloudpack'
 
-Puppet::Face.define :cloudnode, '0.0.1' do
+Puppet::Face.define :node, '0.0.1' do
   action :install do
     summary 'Install Puppet on an arbitrary node'
     description <<-EOT
