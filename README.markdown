@@ -10,6 +10,12 @@ Getting Started
 
  * [Getting Started With CloudPack](http://docs.puppetlabs.com/guides/cloud_pack_getting_started.html)
 
+Required Gems
+=============
+
+ * guid (tested with 0.1.1)
+ * fog (0.7.2)
+
 AMI Image
 ---------
 
