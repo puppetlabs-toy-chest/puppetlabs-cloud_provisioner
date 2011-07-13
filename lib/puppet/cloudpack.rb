@@ -1,8 +1,10 @@
+require 'tempfile'
 require 'rubygems'
 require 'fog'
 require 'puppet/network/http_pool'
 
 module Puppet::CloudPack
+  require 'puppet/cloudpack/installer'
   class << self
 
     # Method to set AWS defaults in a central place.  Lots of things need these
@@ -188,11 +190,12 @@ module Puppet::CloudPack
         EOT
         required
         before_action do |action, arguments, options|
-          unless test 'f', options[:keyfile]
-            raise ArgumentError, "Could not find file '#{options[:keyfile]}'"
+          keyfile = File.expand_path(options[:keyfile])
+          unless test 'f', keyfile
+            raise ArgumentError, "Could not find file '#{keyfile}'"
           end
-          unless test 'r', options[:keyfile]
-            raise ArgumentError, "Could not read from file '#{options[:keyfile]}'"
+          unless test 'r', keyfile
+            raise ArgumentError, "Could not read from file '#{keyfile}'"
           end
         end
       end
@@ -205,9 +208,8 @@ module Puppet::CloudPack
           should be installed on the machine using this image.
           This tarball must be zipped.
         EOT
-        # TODO - this should not be required
-        required
         before_action do |action, arguments, options|
+          options[:installer_payload] = File.expand_path(options[:installer_payload])
           unless test 'f', options[:installer_payload]
             raise ArgumentError, "Could not find file '#{options[:installer_payload]}'"
           end
@@ -226,8 +228,8 @@ module Puppet::CloudPack
           Location of the answers file that should be copied to the machine
           to install Puppet Enterprise.
         EOT
-        required
         before_action do |action, arguments, options|
+          options[:installer_answers] = File.expand_path(options[:installer_answers])
           unless test 'f', options[:installer_answers]
             raise ArgumentError, "Could not find file '#{options[:installer_answers]}'"
           end
@@ -236,6 +238,55 @@ module Puppet::CloudPack
           end
         end
       end
+
+      action.option '--install-script=' do
+        summary 'Name of the template to use for installation'
+        description <<-EOT
+          Name of the template to use for installation. The current
+          list of supported templates is: foss, puppet-enterprise
+        EOT
+      end
+
+      action.option '--puppet-version=' do
+        summary 'version of Puppet to install'
+        description <<-EOT
+          Version of Puppet to be installed. This version is
+          passed to the Puppet installer script.
+        EOT
+        before_action do |action, arguments, options|
+          unless options[:puppet_version] =~ /^(\d+)\.(\d+)(\.(\d+))?$|^(\d)+\.(\d)+\.(\d+)([a-zA-Z][a-zA-Z0-9-]*)$/
+            raise ArgumentError, "Invaid Puppet version '#{options[:puppet_version]}'"
+          end
+        end
+      end
+
+      action.option '--pe-version=' do
+        summary 'version of Puppet Enterprise to install'
+        description <<-EOT
+          Version of Puppet Enterprise to be passed to the installer script.
+          Defaults to 1.1.
+        EOT
+        before_action do |action, arguments, options|
+          unless options[:pe_version] =~ /^(\d+)\.(\d+)(\.(\d+))?$|^(\d)+\.(\d)+\.(\d+)([a-zA-Z][a-zA-Z0-9-]*)$/
+            raise ArgumentError, "Invaid Puppet Enterprise version '#{options[:pe_version]}'"
+          end
+        end
+      end
+
+      action.option '--facter-version=' do
+        summary 'version of facter to install'
+        description <<-EOT
+          The version of facter that should be installed.
+          This only makes sense in open source installation
+          mode.
+        EOT
+        before_action do |action, arguments, options|
+          unless options[:facter_version] =~ /\d+\.\d+\.\d+/
+            raise ArgumentError, "Invaid Facter version '#{options[:facter_version]}'"
+          end
+        end
+      end
+
     end
 
     def add_classify_options(action)
@@ -432,7 +483,13 @@ module Puppet::CloudPack
 
     def install(server, options)
       login    = options[:login]
-      keyfile  = options[:keyfile]
+      keyfile  = File.expand_path(options[:keyfile])
+
+      if options[:install_script] == 'puppet-enterprise'
+        unless options[:installer_payload] and options[:installer_answers]
+          raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
+        end
+      end
 
       if not test('f', '/usr/bin/uuidgen')
         raise "/usr/bin/uuidgen does not exist; please install uuidgen."
@@ -471,22 +528,50 @@ module Puppet::CloudPack
       end
       Puppet.notice "Waiting for SSH response ... Done"
 
-      Puppet.notice "Uploading Puppet ..."
-      scp.upload(options[:installer_payload], '/tmp/puppet.tar.gz')
-      Puppet.notice "Uploading Puppet ... Done"
+      # command for creating cross-ditro tmp dirs
+      tmp_dir = ssh.run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
 
-      Puppet.notice "Uploading Puppet Answer File ..."
-      scp.upload(options[:installer_answers], '/tmp/puppet.answers')
-      Puppet.notice "Uploading Puppet Answer File ... Done"
+      if options[:installer_payload]
+        Puppet.notice "Uploading Puppet Enterprise tarball ..."
+        scp.upload(options[:installer_payload], "#{tmp_dir}/puppet.tar.gz")
+        Puppet.notice "Uploading Puppet Enterprise tarball ... Done"
+      end
+
+      if options[:installer_answers]
+        Puppet.info "Uploading Puppet Answer File ..."
+        scp.upload(options[:installer_answers], "#{tmp_dir}/puppet.answers")
+        Puppet.info "Uploading Puppet Answer File ... Done"
+      end
 
       Puppet.notice "Installing Puppet ..."
-      steps = [
-        'tar -xvzf /tmp/puppet.tar.gz -C /tmp',
-        %Q[echo "q_puppetagent_certname='#{ certname }'" >> /tmp/puppet.answers],
-        '/tmp/puppet-enterprise-1.0-all/puppet-enterprise-installer -a /tmp/puppet.answers &> /tmp/install.log'
-      ]
-      ssh.run(steps.map { |c| login == 'root' ? c : "sudo #{c}" })
-      Puppet.notice "Installing Puppet ... Done"
+      options[:certname] = certname
+      options[:tmp_dir] = tmp_dir
+      options[:server] = Puppet[:server]
+      options[:environment] = Puppet[:environment] || 'production'
+
+      script   = options[:install_script] || 'foss'
+      install_script = Puppet::CloudPack::Installer.build_installer_template(script, options)
+      Puppet.debug("Compiled installation script:")
+      Puppet.debug(install_script)
+      tmp_install_script = Tempfile.new('install_script').path
+      File.open(tmp_install_script, 'w') do |fh|
+        fh.write(install_script)
+      end
+
+      Puppet.notice "Executing Puppet Install Script ..."
+
+      scp.upload(tmp_install_script, "#{tmp_dir}/#{script}.sh")
+      cmd = "bash -c 'chmod u+x #{tmp_dir}/#{script}.sh; #{tmp_dir}/#{script}.sh | tee #{tmp_dir}/install.log'"
+      result = ssh.run(login == 'root' ? cmd : "sudo #{cmd}" )
+      stdout = result[0].stdout
+      stderr = result[0].stderr
+      stdout.each_line do |r|
+        Puppet.debug(r)
+      end
+      stderr.each_line do |r|
+        Puppet.debug(r)
+      end
+      Puppet.notice "Executing Puppet Install Script ... Done"
 
       return certname
     end
