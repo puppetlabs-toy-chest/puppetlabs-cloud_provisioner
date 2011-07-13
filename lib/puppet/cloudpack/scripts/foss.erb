@@ -14,7 +14,7 @@ gpgcheck=1
 EOF
   yum install -y ruby rubygems
 elif [ -f /etc/debian_version ]; then
-  apt-get install ruby rubygems
+  apt-get -y install ruby rubygems
 fi
 gem install facter <% if options[:facter_version] %>-v<%= options[:facter_version] %><% end %> --no-ri --no-rdoc
 gem install puppet <% if options[:puppet_version] %>-v<%= options[:puppet_version] %><% end %> --no-ri --no-rdoc
