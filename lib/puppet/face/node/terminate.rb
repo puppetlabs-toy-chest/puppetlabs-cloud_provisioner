@@ -1,6 +1,6 @@
 require 'puppet/cloudpack'
 
-Puppet::Face.define :cloudnode, '0.0.1' do
+Puppet::Face.define :node, '0.0.1' do
   action :terminate do
     summary 'Terminates the machine instance'
     description <<-EOT

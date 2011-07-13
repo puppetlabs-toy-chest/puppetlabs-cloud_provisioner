@@ -1,7 +1,7 @@
 require 'spec_helper'
 require 'puppet/cloudpack'
 
-describe Puppet::Face[:cloudnode, :current] do
+describe Puppet::Face[:node, :current] do
   before :each do
     @options = {
       :platform => 'AWS'
