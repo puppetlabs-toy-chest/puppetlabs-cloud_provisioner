@@ -48,10 +48,6 @@ describe Puppet::Face[:cloudnode, :current] do
     end
 
     describe '(installer-payload)' do
-      it 'should require an installer payload' do
-        (opts = @options.dup).delete :installer_payload
-        expect { subject.install('server', opts) }.to raise_error ArgumentError, /required/
-      end
 
       it 'should validate the installer payload for existence' do
         opts = @options.update :installer_payload => '/dev/null/nonexistent.file'
@@ -72,10 +68,6 @@ describe Puppet::Face[:cloudnode, :current] do
     end
 
     describe '(installer-answers)' do
-      it 'should require an answers file' do
-        (opts = @options.dup).delete :installer_answers
-        expect { subject.install('server', opts) }.to raise_error ArgumentError, /required/
-      end
 
       it 'should validate the answers file for existence' do
         opts = @options.update :installer_answers => '/dev/null/nonexistent.file'

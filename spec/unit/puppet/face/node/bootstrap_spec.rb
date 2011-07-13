@@ -67,20 +67,6 @@ describe Puppet::Face[:cloudnode, :current] do
       end
     end
 
-    describe '(installer-payload)' do
-      it 'should require an installer payload' do
-        @options.delete(:installer_payload)
-        expect { subject.bootstrap(@options) }.to raise_error ArgumentError, /required/
-      end
-    end
-
-    describe '(installer-answers)' do
-      it 'should require an answers file' do
-        @options.delete(:installer_answers)
-        expect { subject.bootstrap(@options) }.to raise_error ArgumentError, /required/
-      end
-    end
-
     describe '(node-group)' do
       it 'should require a provider' do
         @options.delete(:node_group)
