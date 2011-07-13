@@ -7,7 +7,7 @@ require 'mocha'
 require 'spec_helper'
 installer_klass = Puppet::CloudPack::Installer
 script_dir_name='scripts'
-scripts_dir=File.expand_path("../../../../lib/puppet/cloudpack/#{script_dir_name}")
+scripts_dir=File.expand_path("#{File.dirname(__FILE__)}/../../../../lib/puppet/cloudpack/#{script_dir_name}")
 describe installer_klass do
   def tmp_template(content = 'Here is a <%= options[:variable] %>',name='foo', script_dir_name='scripts')
     tmp_file = Tempfile.new(name).path
@@ -29,7 +29,7 @@ describe installer_klass do
       installer_klass.find_template(template_id).should == template_location
     end
     it 'should be able to use a lib version' do
-      installer_klass.find_template('test').should == File.join(scripts_dir, 'test.erb')
+      installer_klass.find_template('puppet-enterprise').should == File.join(scripts_dir, 'puppet-enterprise.erb')
     end
     it 'should fail when it cannot find a script' do
       now = Time.now.to_i
