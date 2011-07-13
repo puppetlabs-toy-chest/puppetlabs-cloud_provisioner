@@ -46,38 +46,12 @@ describe Puppet::CloudPack do
         it 'should return the dns name of the new instance' do
           @result.should == @server.dns_name
         end
-
-        it "should output the host's fingerprints" do
-          @buffer.should match /PRINTS/
-        end
       end
 
       describe 'in exceptional situations' do
         before(:all) { @options = { :platform => 'AWS', :image => 'ami-12345' } }
 
         subject { Puppet::CloudPack.create(@options) }
-
-        describe 'like when waiting for fingerprints times out' do
-          before :each do
-            server do |server|
-              server.stubs(:console_output).raises(Fog::Errors::Error)
-            end
-          end
-
-          it 'should explain what went wrong' do
-            subject
-            @logs.join.should match /Could not read the host's fingerprints/
-          end
-
-          it 'should provide further instructions' do
-            subject
-            @logs.join.should match /verify the host's fingerprints through/
-          end
-
-          it 'should have a non-nil return value' do
-            subject.should_not be_nil
-          end
-        end
 
         describe 'like when creating the new instance fails' do
           before :each do
@@ -127,6 +101,55 @@ describe Puppet::CloudPack do
         end
       end
     end
+
+    describe '#list' do
+      describe 'with valid arguments' do
+        before :all do
+          @result = subject.list(:platform => 'AWS')
+        end
+        it 'should not be empty' do
+          # We actually get back something like this from Fog:
+          # ["ec2-368-5-559-12.compute-1.amazonaws.com", "ec2-14-92-246-64.compute-1.amazonaws.com"]
+          @result.should_not be_empty
+        end
+        it "should look like a list of DNS names" do
+          @result.each do |hostname|
+            hostname.should match(/^([a-zA-Z0-9-]+)$|^([a-zA-Z0-9-]+\.)+[a-zA-Z0-9-]+$/)
+          end
+        end
+        it "should be a kind of Array" do
+          @result.should be_a_kind_of(Array)
+        end
+      end
+    end
+
+    describe '#fingerprint' do
+      describe 'with valid arguments' do
+        before :all do
+          @connection = Fog::Compute.new(:provider => 'AWS')
+          @servers = @connection.servers
+          @server = @servers.create(:image_id => '12345')
+          # Commented because without a way to mock the busy wait on the console output,
+          # these tests take WAY too long.
+          # @result = subject.fingerprint(@server.dns_name, :platform => 'AWS')
+        end
+        it 'should not be empty' do
+          pending "Fog does not provide a mock Excon::Response instance with a non-nil body.  As a result we wait indefinitely in this test.  Pending a better way to test an instance with console output already available."
+          result = subject.fingerprint(@server.dns_name, :platform => 'AWS')
+          result.should_not be_empty
+        end
+        it "should look like a list of fingerprints" do
+          pending "#8348 unimplemented (What does a valid fingerprint look like?)"
+          result = subject.fingerprint(@server.dns_name, :platform => 'AWS')
+          result.should_not be_empty
+        end
+        it "should be a kind of Array" do
+          pending "#8348 We need a way to mock the busy loop wait on console output."
+          @result.should be_a_kind_of(Hash)
+        end
+      end
+    end
+
   end
 
   describe 'helper functions' do

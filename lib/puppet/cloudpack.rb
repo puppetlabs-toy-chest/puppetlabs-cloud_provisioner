@@ -4,6 +4,44 @@ require 'puppet/network/http_pool'
 
 module Puppet::CloudPack
   class << self
+
+    # Method to set AWS defaults in a central place.  Lots of things need these
+    # defaults, so they all call merge_default_options() to ensure the keys are
+    # set.
+    def merge_default_options(options)
+      default_options = { :region => 'us-east-1', :platform => 'AWS' }
+      default_options.merge(options)
+    end
+
+    def add_region_option(action)
+      action.option '--region=' do
+        summary "The geographic region of the instance. Defaults to us-east-1."
+        description <<-'EOT'
+          The instance may run in any region EC2 operates within.  The regions at the
+          time of this documentation are: US East (Northern Virginia), US West (Northern
+          California), EU (Ireland), Asia Pacific (Singapore), and Asia Pacific (Tokyo).
+
+          The region names for this command are: eu-west-1, us-east-1,
+          ap-northeast-1, us-west-1, ap-southeast-1
+
+          Note: to use another region, you will need to copy your keypair and reconfigure the
+          security groups to allow SSH access.
+        EOT
+        before_action do |action, args, options|
+          # JJM FIXME We shouldn't have to set the defaults here, but we do because the first
+          # required action may not have it's #before_action evaluated yet.  As a result,
+          # the default settings may not be evaluated.
+          options = Puppet::CloudPack.merge_default_options(options)
+
+          regions_response = Puppet::CloudPack.create_connection(options).describe_regions
+          region_names = regions_response.body["regionInfo"].collect { |r| r["regionName"] }.flatten
+          unless region_names.include?(options[:region])
+            raise ArgumentError, "Region must be one of the following: #{region_names.join(', ')}"
+          end
+        end
+      end
+    end
+
     def add_platform_option(action)
       action.option '--platform=' do
         summary 'Platform used to create machine instance (only supports AWS).'
@@ -22,6 +60,7 @@ module Puppet::CloudPack
 
     def add_create_options(action)
       add_platform_option(action)
+      add_region_option(action)
 
       action.option '--image=', '-i=' do
         summary 'AMI to use when creating the instance.'
@@ -32,9 +71,9 @@ module Puppet::CloudPack
         EOT
         required
         before_action do |action, args, options|
-          # We add this option because it's required in Fog but optional for Cloud Pack
+          # We add these options because it's required in Fog but optional for Cloud Pack
           # It doesn't feel right to do this here, but I don't know another way yet.
-          options[:platform] ||= 'AWS'
+          options = Puppet::CloudPack.merge_default_options(options)
           if Puppet::CloudPack.create_connection(options).images.get(options[:image]).nil?
             raise ArgumentError, "Unrecognized image name: #{options[:image]}"
           end
@@ -70,7 +109,7 @@ module Puppet::CloudPack
         before_action do |action, args, options|
           # We add this option because it's required in Fog but optional for Cloud Pack
           # It doesn't feel right to do this here, but I don't know another way yet.
-          options[:platform] ||= 'AWS'
+          options = Puppet::CloudPack.merge_default_options(options)
           if Puppet::CloudPack.create_connection(options).key_pairs.get(options[:keypair]).nil?
             raise ArgumentError, "Unrecognized keypair name: #{options[:keypair]}"
           end
@@ -86,10 +125,9 @@ module Puppet::CloudPack
           Multiple groups can be specified as a list using ':'.
         EOT
         before_action do |action, args, options|
-          # We add this option because it's required in Fog but optional for Cloud Pack
-          # It doesn't feel right to do this here, but I don't know another way yet.
-          options[:platform] ||= 'AWS'
           options[:group] = options[:group].split(File::PATH_SEPARATOR) unless options[:group].is_a? Array
+
+          options = Puppet::CloudPack.merge_default_options(options)
 
           known = Puppet::CloudPack.create_connection(options).security_groups
           unknown = options[:group].select { |g| known.get(g).nil? }
@@ -100,12 +138,23 @@ module Puppet::CloudPack
       end
     end
 
+    def add_list_options(action)
+      add_platform_option(action)
+      add_region_option(action)
+    end
+
+    def add_fingerprint_options(action)
+      add_platform_option(action)
+      add_region_option(action)
+    end
+
     def add_init_options(action)
       add_install_options(action)
       add_classify_options(action)
     end
 
     def add_terminate_options(action)
+      add_region_option(action)
       add_platform_option(action)
       action.option '--force', '-f' do
         summary 'Forces termination of an instance.'
@@ -207,7 +256,7 @@ module Puppet::CloudPack
     end
 
     def classify(certname, options)
-      puts "Using http://#{Puppet[:report_server]}:#{Puppet[:report_port]} as Dashboard."
+      Puppet.info "Using http://#{Puppet[:report_server]}:#{Puppet[:report_port]} as Dashboard."
       http = Puppet::Network::HttpPool.http_instance(Puppet[:report_server], Puppet[:report_port])
 
       # Workaround for the fact that Dashboard is typically insecure.
@@ -215,27 +264,27 @@ module Puppet::CloudPack
       headers = { 'Content-Type' => 'application/json' }
 
       begin
-        print 'Registering node ...'
+        Puppet.notice 'Registering node ...'
         data = { 'node' => { 'name' => certname } }
         response = http.post('/nodes.json', data.to_pson, headers)
         if (response.code == '201')
-          puts ' Done'
+          Puppet.notice 'Registering node ... Done'
         else
-          puts ' Failed'
+          Puppet.warning 'Registering node ... Failed'
           Puppet.warning "Server responded with a #{response.code} status"
         end
 
-        print 'Classifying node ...'
+        Puppet.notice 'Classifying node ...'
         data = { 'node_name' => certname, 'group_name' => options[:node_group] }
         response = http.post("/memberships.json", data.to_pson, headers)
         if (response.code == '201')
-          puts ' Done'
+          Puppet.notice 'Classifying node ... Done'
         else
-          puts ' Failed'
+          Puppet.warning 'Classifying node ... Failed'
           Puppet.warning "Server responded with a #{response.code} status"
         end
       rescue Errno::ECONNREFUSED
-        puts ' Error'
+        Puppet.warning 'Registering node ... Error'
         Puppet.err "Could not connect to host http://#{Puppet[:report_server]}:#{Puppet[:report_port]}"
         Puppet.err "Check your report_server and report_port options"
         exit(1)
@@ -245,14 +294,15 @@ module Puppet::CloudPack
     end
 
     def create(options)
+      options = merge_default_options(options)
       unless options.has_key? :_destroy_server_at_exit
         options[:_destroy_server_at_exit] = :create
       end
 
-      print "Connecting to #{options[:platform]} ..."
+      Puppet.info("Connecting to #{options[:platform]} #{options[:region]} ...")
       connection = create_connection(options)
-      puts ' Done'
-      puts "#{options[:type]}"
+      Puppet.info("Connecting to #{options[:platform]} #{options[:region]} ... Done")
+      Puppet.info("Instance Type: #{options[:type]}")
 
       # TODO: Validate that the security groups permit SSH access from here.
       # TODO: Can this throw errors?
@@ -263,44 +313,36 @@ module Puppet::CloudPack
         :flavor_id  => options[:type]
       )
 
+      # This is the earliest point we have knowledge of the instance ID
+      Puppet.info("Instance identifier: #{server.id}")
+
       Signal.trap(:EXIT) do
         if options[:_destroy_server_at_exit]
           server.destroy rescue nil
+          Puppet.err("Destroyed server #{server.id} because of an abnormal exit")
         end
       end
 
       create_tags(connection.tags, server)
 
-      print 'Starting up '
+      Puppet.notice("Launching server #{server.id} ...")
       retries = 0
       begin
         server.wait_for do
-          print '.'
+          print '#'
           self.ready?
         end
-        puts ' Done'
+        puts
+        Puppet.notice("Server #{server.id} is now launched")
       rescue Fog::Errors::Error
-        puts "Failed"
+        Puppet.err "Launching server #{server.id} Failed."
         Puppet.err "Could not connect to host"
         Puppet.err "Please check your network connection and try again"
         return nil
       end
 
-      # TODO: Find a better way of getting the Fingerprints
-      begin
-        print 'Waiting for host fingerprints '
-        Fog.wait_for do
-          print '.'
-          not server.console_output.body['output'].nil?
-        end or raise Fog::Errors::Error, "Waiting for host fingerprints timed out"
-        puts ' Done'
-
-        puts *server.console_output.body['output'].grep(/^ec2:/)
-      rescue Fog::Errors::Error => e
-        puts "Failed"
-        Puppet.warning "Could not read the host's fingerprints"
-        Puppet.warning "Please verify the host's fingerprints through AWS"
-      end
+      # This is the earliest point we have knowledge of the DNS name
+      Puppet.notice("Server #{server.id} public dns name: #{server.dns_name}")
 
       if options[:_destroy_server_at_exit] == :create
         options.delete(:_destroy_server_at_exit)
@@ -309,11 +351,60 @@ module Puppet::CloudPack
       return server.dns_name
     end
 
+    def list(options)
+      options = merge_default_options(options)
+      connection = create_connection(options)
+      servers = connection.servers
+      # Convert the Fog object into a simple array.
+      # And return the array to the Faces API for rendering
+      servers.collect { |i| i.dns_name }
+    end
+
+    def fingerprint(server, options)
+      options = merge_default_options(options)
+      connection = create_connection(options)
+      servers = connection.servers.all('dns-name' => server)
+
+      # Our hash for output.  We'll collect into this data structure.
+      output_hash = {}
+      output_array = servers.collect do |myserver|
+        # TODO: Find a better way of getting the Fingerprints
+        # The current method scrapes the AWS console looking for an ^ec2: pattern
+        # This is not robust or ideal.  We make a "best effort" to find the fingerprint
+        begin
+          # Is there any console output yet?
+          if myserver.console_output.body['output'].nil? then
+            Puppet.info("Waiting for instance console output to become available ...")
+            Fog.wait_for do
+              print "#"
+              not myserver.console_output.body['output'].nil?
+            end or raise Fog::Errors::Error, "Waiting for console output timed out"
+            puts "# Console output is ready"
+          end
+          # FIXME Where is the fingerprint?  Do we output it ever?
+          { "#{myserver.id}" => myserver.console_output.body['output'].grep(/^ec2:/) }
+        rescue Fog::Errors::Error => e
+          Puppet.warning("Waiting for SSH host key fingerprint from #{options[:platform]} ... Failed")
+          Puppet.warning "Could not read the host's fingerprints"
+          Puppet.warning "Please verify the host's fingerprints through the AWS console output"
+        end
+      end
+      output_array.each { |hsh| output_hash = hsh.merge(output_hash) }
+      # Check to see if we got anything back
+      if output_hash.collect { |k,v| v }.flatten.empty? then
+        Puppet.warning "We could not securely find a fingerprint because the image did not print the fingerprint to the console."
+        Puppet.warning "Please use an AMI that prints the fingerprint to the console in order to connect to the instance more securely."
+        Puppet.info "The system is ready.  Please add the host key to your known hosts file."
+        Puppet.info "For example: ssh root@#{server} and respond yes."
+      end
+      output_hash
+    end
+
     def init(server, options)
       certname = install(server, options)
       options.delete(:_destroy_server_at_exit)
 
-      puts "Puppet Enterprise is now installed on: #{server}"
+      Puppet.notice "Puppet Enterprise is now installed on: #{server}"
 
       classify(certname, options)
 
@@ -322,16 +413,20 @@ module Puppet::CloudPack
 
       # TODO: Wait for C.S.R.?
 
-      print "Signing certificate ..."
+      Puppet.notice "Signing certificate ..."
       begin
         Puppet::Face[:certificate, '0.0.1'].sign(certname, opts)
-        puts " Done"
+        Puppet.notice "Signing certificate ... Done"
       rescue Puppet::Error => e
         # TODO: Write useful next steps.
-        puts " Failed"
+        Puppet.err "Signing certificate ... Failed"
+        Puppet.err "Signing certificate error: #{e}"
+        exit(1)
       rescue Net::HTTPError => e
         # TODO: Write useful next steps
-        puts " Failed"
+        Puppet.warning "Signing certificate ... Failed"
+        Puppet.err "Signing certificate error: #{e}"
+        exit(1)
       end
     end
 
@@ -352,40 +447,46 @@ module Puppet::CloudPack
       ssh = Fog::SSH.new(server, login, opts)
       scp = Fog::SCP.new(server, login, opts)
 
-      print "Waiting for SSH response ..."
+      Puppet.notice "Waiting for SSH response ..."
       retries = 0
       begin
         # TODO: Certain cases cause this to hang?
         ssh.run(['hostname'])
-      rescue Net::SSH::AuthenticationFailed
-        puts " Failed"
-        raise "Check your authentication credentials and try again."
+      rescue Net::SSH::AuthenticationFailed => e
+        Puppet.info "Got an SSH authentication failure (Retry #{retries}), this may because the machine is booting. (Sleeping for 5 seconds)"
+        sleep 5
+        retries += 1
+        if retries > 10
+          Puppet.err "Could not connect via SSH.  The error is: #{e}"
+          Puppet.err "This may be a result of the SSH public key for key #{options[:keyfile]} not being installed into the authorized_keys file of the remote login account."
+          raise Puppet::Error, "Check your authentication credentials and try again."
+        end
+        retry
       rescue => e
         sleep 5
         retries += 1
-        print '.'
-        puts " Failed"
+        Puppet.notice "Still waiting for SSH response ... (Retry #{retries})"
         raise "SSH not responding; aborting." if retries > 60
         retry
       end
-      puts " Done"
+      Puppet.notice "Waiting for SSH response ... Done"
 
-      print "Uploading Puppet ..."
+      Puppet.notice "Uploading Puppet ..."
       scp.upload(options[:installer_payload], '/tmp/puppet.tar.gz')
-      puts " Done"
+      Puppet.notice "Uploading Puppet ... Done"
 
-      print "Uploading Puppet Answer File ..."
+      Puppet.notice "Uploading Puppet Answer File ..."
       scp.upload(options[:installer_answers], '/tmp/puppet.answers')
-      puts " Done"
+      Puppet.notice "Uploading Puppet Answer File ... Done"
 
-      print "Installing Puppet ..."
+      Puppet.notice "Installing Puppet ..."
       steps = [
         'tar -xvzf /tmp/puppet.tar.gz -C /tmp',
         %Q[echo "q_puppetagent_certname='#{ certname }'" >> /tmp/puppet.answers],
         '/tmp/puppet-enterprise-1.0-all/puppet-enterprise-installer -a /tmp/puppet.answers &> /tmp/install.log'
       ]
       ssh.run(steps.map { |c| login == 'root' ? c : "sudo #{c}" })
-      puts " Done"
+      Puppet.notice "Installing Puppet ... Done"
 
       return certname
     end
@@ -393,14 +494,21 @@ module Puppet::CloudPack
     def terminate(server, options)
       # JJM This isn't ideal, it would be better to set the default in the
       # option handling block, but I'm not sure how to do this.
-      options[:platform] ||= 'AWS'
-      print "Connecting to #{options[:platform]} ..."
+      options = merge_default_options(options)
+
+      Puppet.info "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
-      puts ' Done'
+      Puppet.info "Connecting to #{options[:platform]} ... Done"
 
       servers = connection.servers.all('dns-name' => server)
       if servers.length == 1 || options[:force]
-        servers.each { |server| server.destroy() }
+        # We're using myserver rather than server to prevent ruby 1.8 from
+        # overwriting the server method argument
+        servers.each do |myserver|
+          Puppet.notice "Destroying #{myserver.id} (#{myserver.dns_name}) ..."
+          myserver.destroy()
+          Puppet.notice "Destroying #{myserver.id} (#{myserver.dns_name}) ... Done"
+        end
       elsif servers.empty?
         Puppet.warning "Could not find server with DNS name '#{server}'"
       else
@@ -410,26 +518,34 @@ module Puppet::CloudPack
       return nil
     end
 
-
     def create_connection(options = {})
-      Fog::Compute.new(:provider => options[:platform])
+      # We don't support more than AWS, but this satisfies the rspec tests
+      # that pass in a provider string that does not match 'AWS'.  This makes
+      # the test pass by preventing Fog from throwing an error when the region
+      # option is not expected
+      case options[:platform]
+      when 'AWS'
+        Fog::Compute.new(:provider => options[:platform], :region => options[:region])
+      else
+        Fog::Compute.new(:provider => options[:platform])
+      end
     end
 
     def create_server(servers, options = {})
-      print 'Creating new instance ...'
+      Puppet.notice('Creating new instance ...')
       server = servers.create(options)
-      puts ' Done'
+      Puppet.notice("Creating new instance ... Done")
       return server
     end
 
     def create_tags(tags, server)
-      print 'Creating tags for instance ...'
+      Puppet.notice('Creating tags for instance ...')
       tags.create(
         :key         => 'Created-By',
         :value       => 'Puppet',
         :resource_id => server.id
       )
-      puts ' Done'
+      Puppet.notice('Creating tags for instance ... Done')
     end
   end
 end
