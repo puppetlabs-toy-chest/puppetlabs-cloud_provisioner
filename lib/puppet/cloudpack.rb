@@ -2,6 +2,7 @@ require 'tempfile'
 require 'rubygems'
 require 'guid'
 require 'fog'
+require 'net/ssh'
 require 'puppet/network/http_pool'
 
 module Puppet::CloudPack
@@ -504,8 +505,24 @@ module Puppet::CloudPack
       Puppet.notice "Waiting for SSH response ..."
       retries = 0
       begin
-        # TODO: Certain cases cause this to hang?
-        ssh.run(['hostname'])
+        # This block tries to execute the date command on the remote system
+        # Executing the date command seems like a reasonable test if the system
+        # is ready or not.
+        Net::SSH.start(server, login, :keys => [ options[:keyfile] ]) do |session|
+          session.open_channel do |channel|
+            channel.on_data do |ch, data|
+              data.chomp!
+              Puppet.debug("SSH Response: #{data} (This should look like a timestamp)")
+            end
+            #http://groups.google.com/group/comp.lang.ruby/browse_thread/thread/a806b0f5dae4e1e2
+            channel.on_request("exit-status") do |ch, data|
+              exit_code = data.read_long
+              Puppet.debug("SSH Response exit code: #{exit_code}")
+            end
+            # Finally execute the date command
+            channel.exec "date"
+          end
+        end
       rescue Net::SSH::AuthenticationFailed => e
         Puppet.info "Got an SSH authentication failure (Retry #{retries}), this may because the machine is booting. (Sleeping for 5 seconds)"
         sleep 5
@@ -526,6 +543,7 @@ module Puppet::CloudPack
       Puppet.notice "Waiting for SSH response ... Done"
 
       # command for creating cross-ditro tmp dirs
+      # JJM This should be switched over to Net::SSH, but I like the fog mocking for the time being.
       tmp_dir = ssh.run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
 
       if options[:installer_payload]
@@ -564,17 +582,29 @@ module Puppet::CloudPack
       Puppet.notice "Executing Puppet Install Script ..."
 
       scp.upload(tmp_install_script, "#{tmp_dir}/#{script}.sh")
-      cmd = "bash -c 'chmod u+x #{tmp_dir}/#{script}.sh; #{tmp_dir}/#{script}.sh | tee #{tmp_dir}/install.log'"
-      result = ssh.run(login == 'root' ? cmd : "sudo #{cmd}" )
-      stdout = result[0].stdout
-      stderr = result[0].stderr
-      stdout.each_line do |r|
-        Puppet.debug(r)
+      cmd = "bash -c 'chmod u+x #{tmp_dir}/#{script}.sh; #{tmp_dir}/#{script}.sh'"
+
+      # Capture the exit status and output of the script.
+      installation_status = nil
+      Net::SSH.start(server, login, :keys => [ options[:keyfile] ]) do |session|
+        session.open_channel do |channel|
+          channel.on_data do |ch, data|
+            data.chomp!
+            Puppet.info("installer: #{data}")
+          end
+          #http://groups.google.com/group/comp.lang.ruby/browse_thread/thread/a806b0f5dae4e1e2
+          channel.on_request("exit-status") do |ch, data|
+            exit_code = data.read_long
+            if exit_code > 0
+              raise Puppet::Error, "Installation script #{options[:install_script]} failed with exit code #{exit_code}"
+            else
+              Puppet.notice("Exicuting Puppet Install Script ... Done (Success!)")
+            end
+          end
+          # Finally execute the date command
+          channel.exec(cmd)
+        end
       end
-      stderr.each_line do |r|
-        Puppet.debug(r)
-      end
-      Puppet.notice "Executing Puppet Install Script ... Done"
 
       return certname
     end
