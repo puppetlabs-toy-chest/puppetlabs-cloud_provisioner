@@ -489,7 +489,14 @@ module Puppet::CloudPack
 
       if options[:install_script] == 'puppet-enterprise'
         unless options[:installer_payload] and options[:installer_answers]
-          raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
+          raise 'Must specify installer payload and answers file if install script is puppet-enterprise'
+        end
+      end
+
+      # Puppet enterprise install scripts, even those using S3, need and installer answer file.
+      if options[:install_script] =~ /^puppet-enterprise-/
+        unless options[:installer_answers]
+          raise "Must specify an answers file for install script #{options[:install_script]}"
         end
       end
 
