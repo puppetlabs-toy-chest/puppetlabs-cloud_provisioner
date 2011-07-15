@@ -128,8 +128,9 @@ describe Puppet::CloudPack do
         end
         it 'Exceptions eventually cause a failure' do
           Fog::SSH.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@ssh_mock)
-          @ssh_mock.stubs(:run).with do |var| raise(Exception, 'fails') end
-          expect { subject.ssh_connect('server', 'root', @keyfile.path) }.should raise_error
+          subject.stubs(:sleep)
+          @ssh_mock.stubs(:run).with do |var| raise(Net::SSH::AuthenticationFailed, 'fails') end
+          expect { subject.ssh_connect('server', 'root', @keyfile.path) }.should raise_error(Puppet::Error)
         end
       end
       describe '#upload_payloads' do
