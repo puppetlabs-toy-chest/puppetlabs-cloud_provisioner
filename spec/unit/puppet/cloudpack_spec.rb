@@ -130,6 +130,47 @@ describe Puppet::CloudPack do
           expect { subject.ssh_connect('server', 'root', @keyfile.path) }.should raise_error
         end
       end
+      describe '#upload_payloads' do
+        it 'should not upload anything if nothing is specifed to upload' do
+          @scp_mock.expects(:upload).never
+          @result = subject.upload_payloads(
+            @scp_mock,
+            {}
+          )
+        end
+        it 'should install answer file when specified' do
+          @scp_mock.expects(:upload).with('foo', "/tmp/puppet.answers")
+          @result = subject.upload_payloads(
+            @scp_mock,
+            {:installer_answers => 'foo', :tmp_dir => '/tmp'}
+          )
+        end
+        it 'should install installer_payload when specified' do
+          @scp_mock.expects(:upload).with('foo', "/tmp/puppet.tar.gz")
+          @result = subject.upload_payloads(
+            @scp_mock,
+            {:installer_payload => 'foo', :tmp_dir => '/tmp'}
+          )
+        end
+        it 'should require installer payload when install-script is puppet-enterprise' do
+          expect do
+            subject.upload_payloads(
+              @scp_mock,
+              :install_script => 'puppet-enterprise',
+              :installer_answers => 'foo'
+            )
+          end.should raise_error Exception, /Must specify installer payload/
+        end
+        it 'should require installer answers when install-script is puppet-enterprise' do
+          expect do
+            subject.upload_payloads(
+              @scp_mock,
+              :install_script => 'puppet-enterprise',
+              :installer_payload => 'foo'
+            )
+          end.should raise_error Exception, /Must specify .*? answers file/
+        end
+      end
     end
     describe '#terminate' do
       describe 'with valid arguments' do
