@@ -493,6 +493,7 @@ module Puppet::CloudPack
       certname = Guid.new.to_s
 
       upload_payloads(connections[:scp], options)
+      tmp_script_path = compile_template(options)
     def ssh_connect(server, login, keyfile = nil)
       opts = {}
       opts[:key_data] = [File.read(File.expand_path(keyfile))] if keyfile
@@ -545,26 +546,26 @@ module Puppet::CloudPack
       end
     end
 
+    def compile_template(options)
       Puppet.notice "Installing Puppet ..."
-      options[:certname] = certname
-      options[:tmp_dir] = tmp_dir
       options[:server] = Puppet[:server]
       options[:environment] = Puppet[:environment] || 'production'
+      options[:install_script] ||= 'foss'
 
-      script   = options[:install_script] || 'foss'
-      install_script = Puppet::CloudPack::Installer.build_installer_template(script, options)
+      install_script = Puppet::CloudPack::Installer.build_installer_template(options[:install_script], options)
       Puppet.debug("Compiled installation script:")
       Puppet.debug(install_script)
 
       # create a temp file to write compiled script
-      # capture the name of the path as tmp_install_script
-      tmp_install_script = begin
+      # return the path of the temp location of the script
+      begin
         f = Tempfile.open('install_script')
         f.write(install_script)
         f.path
       ensure
         f.close
       end
+    end
 
       Puppet.notice "Executing Puppet Install Script ..."
 
