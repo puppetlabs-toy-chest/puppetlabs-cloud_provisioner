@@ -483,20 +483,20 @@ module Puppet::CloudPack
     end
 
     def install(server, options)
-      login    = options[:login]
-      keyfile  = File.expand_path(options[:keyfile])
 
       if options[:install_script] == 'puppet-enterprise'
         unless options[:installer_payload] and options[:installer_answers]
           raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
         end
       end
+      connections = ssh_connect(server, options[:login], options[:keyfile])
 
       # This requires the "guid" gem
       certname = Guid.new.to_s
 
+    def ssh_connect(server, login, keyfile = nil)
       opts = {}
-      opts[:key_data] = [File.read(keyfile)] if keyfile
+      opts[:key_data] = [File.read(File.expand_path(keyfile))] if keyfile
 
       ssh = Fog::SSH.new(server, login, opts)
       scp = Fog::SCP.new(server, login, opts)
@@ -512,7 +512,7 @@ module Puppet::CloudPack
         retries += 1
         if retries > 10
           Puppet.err "Could not connect via SSH.  The error is: #{e}"
-          Puppet.err "This may be a result of the SSH public key for key #{options[:keyfile]} not being installed into the authorized_keys file of the remote login account."
+          Puppet.err "This may be a result of the SSH public key for key #{:keyfile} not being installed into the authorized_keys file of the remote login account."
           raise Puppet::Error, "Check your authentication credentials and try again."
         end
         retry
@@ -524,6 +524,8 @@ module Puppet::CloudPack
         retry
       end
       Puppet.notice "Waiting for SSH response ... Done"
+      {:ssh => ssh, :scp => scp}
+    end
 
       # command for creating cross-ditro tmp dirs
       tmp_dir = ssh.run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
