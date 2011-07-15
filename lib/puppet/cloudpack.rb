@@ -491,6 +491,9 @@ module Puppet::CloudPack
       end
       connections = ssh_connect(server, options[:login], options[:keyfile])
 
+      # command for creating cross-ditro tmp dirs
+      options[:tmp_dir] = connections[:ssh].run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
+
       # This requires the "guid" gem
       certname = Guid.new.to_s
 
@@ -526,9 +529,6 @@ module Puppet::CloudPack
       Puppet.notice "Waiting for SSH response ... Done"
       {:ssh => ssh, :scp => scp}
     end
-
-      # command for creating cross-ditro tmp dirs
-      tmp_dir = ssh.run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
 
       if options[:installer_payload]
         Puppet.notice "Uploading Puppet Enterprise tarball ..."
