@@ -484,11 +484,6 @@ module Puppet::CloudPack
 
     def install(server, options)
 
-      if options[:install_script] == 'puppet-enterprise'
-        unless options[:installer_payload] and options[:installer_answers]
-          raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
-        end
-      end
       connections = ssh_connect(server, options[:login], options[:keyfile])
 
       # command for creating cross-ditro tmp dirs
@@ -497,6 +492,7 @@ module Puppet::CloudPack
       # This requires the "guid" gem
       certname = Guid.new.to_s
 
+      upload_payloads(connections[:scp], options)
     def ssh_connect(server, login, keyfile = nil)
       opts = {}
       opts[:key_data] = [File.read(File.expand_path(keyfile))] if keyfile
@@ -530,17 +526,24 @@ module Puppet::CloudPack
       {:ssh => ssh, :scp => scp}
     end
 
+    def upload_payloads(scp, options)
+      if options[:install_script] == 'puppet-enterprise'
+        unless options[:installer_payload] and options[:installer_answers]
+          raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
+        end
+      end
       if options[:installer_payload]
         Puppet.notice "Uploading Puppet Enterprise tarball ..."
-        scp.upload(options[:installer_payload], "#{tmp_dir}/puppet.tar.gz")
+        scp.upload(options[:installer_payload], "#{options[:tmp_dir]}/puppet.tar.gz")
         Puppet.notice "Uploading Puppet Enterprise tarball ... Done"
       end
 
       if options[:installer_answers]
         Puppet.info "Uploading Puppet Answer File ..."
-        scp.upload(options[:installer_answers], "#{tmp_dir}/puppet.answers")
+        scp.upload(options[:installer_answers], "#{options[:tmp_dir]}/puppet.answers")
         Puppet.info "Uploading Puppet Answer File ... Done"
       end
+    end
 
       Puppet.notice "Installing Puppet ..."
       options[:certname] = certname
