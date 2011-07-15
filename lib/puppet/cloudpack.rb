@@ -490,7 +490,7 @@ module Puppet::CloudPack
       options[:tmp_dir] = connections[:ssh].run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
 
       # This requires the "guid" gem
-      certname = Guid.new.to_s
+      options[:certname] ||= Guid.new.to_s
 
       upload_payloads(connections[:scp], options)
       tmp_script_path = compile_template(options)
