@@ -561,19 +561,34 @@ module Puppet::CloudPack
 
     def ssh_test_connect(server, login, keyfile = nil)
       Puppet.notice "Waiting for SSH response ..."
+      # TODO I'd really like this all to be based on wall time and not retry counts.
+      # We should only really block for 3 minutes or so.
       retries = 0
       begin
         ssh_remote_execute(server, login, "date", keyfile)
-      rescue Net::SSH::AuthenticationFailed => e
-        Puppet.info "Got an SSH authentication failure (Retry #{retries}), this may be because the machine is booting. (Sleeping for 5 seconds)"
-        sleep 5
-        retries += 1
-        if retries > 10
+      rescue Net::SSH::AuthenticationFailed, Errno::ECONNREFUSED => e
+        if (retries += 1) > 10
           Puppet.err "Could not connect via SSH.  The error is: #{e}"
-          Puppet.err "This may be a result of the SSH public key for key #{keyfile} not being installed into the authorized_keys file of the remote login account."
+          Puppet.err "Please check to make sure your ssh key is working properly, e.g. ssh #{login}@#{server}"
           raise Puppet::Error, "Check your authentication credentials and try again."
+        else
+          Puppet.info "Failed to connect with issue #{e} (Retry #{retries})"
+          Puppet.info "This may be because the machine is booting.  Retrying the connection..."
+          sleep 5
         end
         retry
+      rescue Errno::ETIMEDOUT => e
+        if (retries += 1) > 3
+          Puppet.err "Could not connect via SSH.  The error is: #{e}"
+          Puppet.err "This indicates the machine has not even come online yet.  Please check if the system launched."
+          raise Puppet::Error, "Too many timeouts trying to connect."
+        else
+          Puppet.info "Failed to connect with issue #{e} (Retry #{retries})"
+          Puppet.info "This may be because the machine is booting.  Retrying the connection..."
+        end
+      rescue Exception => e
+        Puppet.err("Unhandled connection robustness error: #{e.class} [#{e.inspect}]")
+        raise e
       end
       Puppet.notice "Waiting for SSH response ... Done"
       true
