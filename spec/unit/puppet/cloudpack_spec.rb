@@ -171,6 +171,21 @@ describe Puppet::CloudPack do
           end.should raise_error Exception, /Must specify .*? answers file/
         end
       end
+      describe '#run install script' do
+        it 'should upload the script and execute it' do
+          @scp_mock.expects(:upload).with('foo_file', "/tmp/foo.sh")
+          @ssh_mock.expects(:run).with("bash -c 'chmod u+x /tmp/foo.sh; /tmp/foo.sh | tee /tmp/install.log'").returns([Fog::SSH::Mock::Result.new('foo')])
+          subject.run_install_script(
+            @ssh_mock, @scp_mock, 'foo_file', '/tmp', 'foo', 'root'
+          )
+        end
+        it 'should execte script with sudo when login is not root' do
+          @ssh_mock.expects(:run).with("sudo bash -c 'chmod u+x /tmp/foo.sh; /tmp/foo.sh | tee /tmp/install.log'").returns([Fog::SSH::Mock::Result.new('foo')])
+          subject.run_install_script(
+            @ssh_mock, @scp_mock, 'foo_file', '/tmp', 'foo', 'dan'
+          )
+        end
+      end
       describe '#compile_template' do
         it 'should be able to compile a template' do
           tmp_file = begin
