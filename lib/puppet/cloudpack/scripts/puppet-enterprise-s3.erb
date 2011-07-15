@@ -1,0 +1,33 @@
+#! /bin/bash
+#
+set -e
+set -u
+
+# this assumes that the payload has already been delivered
+tmpdir='<%= options[:tmp_dir] %>'
+cd "${tmpdir}"
+
+pe_version="<%= options[:pe_version] || '1.1' %>"
+
+payload="puppet-enterprise-${pe_version}-all"
+
+echo "Installation script has started..."
+echo "Downloading from https://puppetlabs.s3.amazonaws.com/pe/${payload}.tar.gz"
+
+# Download the installer payload from S3
+wget --progress=dot:mega "https://puppetlabs.s3.amazonaws.com/pe/${payload}.tar.gz" 2>&1
+
+echo "Uncompressing ${payload}.tar.gz ..."
+
+# copied by the install action of cloudpack
+tar -xzf "${payload}.tar.gz"
+
+if grep -q '^q_puppetagent_certname' puppet.answers; then
+  echo 'PE answers file already contains line q_puppetagent_certname'
+  exit 1
+fi
+
+echo "q_puppetagent_certname='<%= options[:certname] %>'" >> puppet.answers
+
+puppet-enterprise-${pe_version}-all/puppet-enterprise-installer -a puppet.answers
+

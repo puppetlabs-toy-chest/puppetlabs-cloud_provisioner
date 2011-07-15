@@ -78,6 +78,16 @@ describe Puppet::Face[:node, :current] do
         File.chmod 0300, @options[:installer_answers]
         expect { subject.install('server', @options) }.to raise_error ArgumentError, /could not read/i
       end
+
+      it 'should require an answers file if the script starts with puppet-enterprise-' do
+        pending "The validation happens inside the install action, so this doesn't work because the install action is being mocked"
+        opts = @options.dup
+        opts.delete(:installer_payload)
+        opts.delete(:installer_answers)
+        opts[:installer_script] = "puppet-enterprise-s3"
+        expect { subject.install('server', opts) }.to raise_error ArgumentError, /answers/i
+      end
+
     end
   end
 end

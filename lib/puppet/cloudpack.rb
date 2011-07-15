@@ -2,6 +2,7 @@ require 'tempfile'
 require 'rubygems'
 require 'guid'
 require 'fog'
+require 'net/ssh'
 require 'puppet/network/http_pool'
 require 'net/ssh'
 
@@ -494,50 +495,114 @@ module Puppet::CloudPack
 
     def install(server, options)
 
-      connections = ssh_connect(server, options[:login], options[:keyfile])
-
-      # command for creating cross-ditro tmp dirs
-      options[:tmp_dir] = connections[:ssh].run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
-
-      # This requires the "guid" gem
       options[:certname] ||= Guid.new.to_s
 
+      # FIXME We shouldn't try to connect if the answers file hasn't been provided
+      # for the installer script matching puppet-enterprise-* (e.g. puppet-enterprise-s3)
+      connections = ssh_connect(server, options[:login], options[:keyfile])
+
+      options[:tmp_dir] = File.join('/', 'tmp', Guid.new.to_s)
+      create_tmpdir_cmd = "mkdir #{options[:tmp_dir]}"
+      ssh_remote_execute(server, options[:login], create_tmpdir_cmd, options[:keyfile])
+
       upload_payloads(connections[:scp], options)
+
       tmp_script_path = compile_template(options)
-      run_install_script(connections[:ssh], connections[:scp], tmp_script_path, options[:tmp_dir], options[:install_script], options[:login])
+
+      remote_script_path = File.join(options[:tmp_dir], "#{options[:install_script]}.sh")
+      connections[:scp].upload(tmp_script_path, remote_script_path)
+
+      # Finally, execute the installer script
+      install_command = "bash -c 'chmod u+x #{remote_script_path}; #{remote_script_path}'"
+      ssh_remote_execute(server, options[:login], install_command, options[:keyfile])
+
       options[:certname]
+    end
+
+    # This is the single place to make SSH calls.  It will handle collecting STDOUT
+    # in a line oriented manner, printing it to debug log destination and checking the
+    # exit code of the remote call.  This should also make it much easier to do unit testing on
+    # all of the other methods that need this functionality.  Finally, it should provide
+    # one place to swap out the back end SSH implementation if need be.
+    def ssh_remote_execute(server, login, command, keyfile = nil)
+      Puppet.info "Executing remote command ..."
+      Puppet.debug "Command: #{command}"
+      buffer = String.new
+      exit_code = nil
+      Net::SSH.start(server, login, :keys => [ keyfile ]) do |session|
+        session.open_channel do |channel|
+          channel.on_data do |ch, data|
+            buffer << data
+            if buffer =~ /\n/
+              lines = buffer.split("\n")
+              buffer = lines.length > 1 ? lines.pop : String.new
+              lines.each do |line|
+                Puppet.debug(line)
+              end
+            end
+          end
+          channel.on_eof do |ch|
+            # Display anything remaining in the buffer
+            unless buffer.empty?
+              Puppet.debug(buffer)
+            end
+          end
+          channel.on_request("exit-status") do |ch, data|
+            exit_code = data.read_long
+            Puppet.debug("SSH Command Exit Code: #{exit_code}")
+          end
+          # Finally execute the command
+          channel.exec(command)
+        end
+      end
+      Puppet.info "Executing remote command ... Done"
+      exit_code
+    end
+
+    def ssh_test_connect(server, login, keyfile = nil)
+      Puppet.notice "Waiting for SSH response ..."
+      # TODO I'd really like this all to be based on wall time and not retry counts.
+      # We should only really block for 3 minutes or so.
+      retries = 0
+      begin
+        ssh_remote_execute(server, login, "date", keyfile)
+      rescue Net::SSH::AuthenticationFailed, Errno::ECONNREFUSED => e
+        if (retries += 1) > 10
+          Puppet.err "Could not connect via SSH.  The error is: #{e}"
+          Puppet.err "Please check to make sure your ssh key is working properly, e.g. ssh #{login}@#{server}"
+          raise Puppet::Error, "Check your authentication credentials and try again."
+        else
+          Puppet.info "Failed to connect with issue #{e} (Retry #{retries})"
+          Puppet.info "This may be because the machine is booting.  Retrying the connection..."
+          sleep 5
+        end
+        retry
+      rescue Errno::ETIMEDOUT => e
+        if (retries += 1) > 3
+          Puppet.err "Could not connect via SSH.  The error is: #{e}"
+          Puppet.err "This indicates the machine has not even come online yet.  Please check if the system launched."
+          raise Puppet::Error, "Too many timeouts trying to connect."
+        else
+          Puppet.info "Failed to connect with issue #{e} (Retry #{retries})"
+          Puppet.info "This may be because the machine is booting.  Retrying the connection..."
+        end
+      rescue Exception => e
+        Puppet.err("Unhandled connection robustness error: #{e.class} [#{e.inspect}]")
+        raise e
+      end
+      Puppet.notice "Waiting for SSH response ... Done"
+      true
     end
 
     def ssh_connect(server, login, keyfile = nil)
       opts = {}
       opts[:key_data] = [File.read(File.expand_path(keyfile))] if keyfile
 
+      ssh_test_connect(server, login, keyfile)
+
       ssh = Fog::SSH.new(server, login, opts)
       scp = Fog::SCP.new(server, login, opts)
 
-      Puppet.notice "Waiting for SSH response ..."
-      retries = 0
-      begin
-        # TODO: Certain cases cause this to hang?
-        ssh.run(['hostname'])
-      rescue Net::SSH::AuthenticationFailed => e
-        Puppet.info "Got an SSH authentication failure (Retry #{retries}), this may because the machine is booting. (Sleeping for 5 seconds)"
-        sleep 5
-        retries += 1
-        if retries > 10
-          Puppet.err "Could not connect via SSH.  The error is: #{e}"
-          Puppet.err "This may be a result of the SSH public key for key #{keyfile} not being installed into the authorized_keys file of the remote login account."
-          raise Puppet::Error, "Check your authentication credentials and try again."
-        end
-        retry
-      rescue => e
-        sleep 5
-        retries += 1
-        Puppet.notice "Still waiting for SSH response ... (Retry #{retries})"
-        raise "SSH not responding; aborting." if retries > 60
-        retry
-      end
-      Puppet.notice "Waiting for SSH response ... Done"
       {:ssh => ssh, :scp => scp}
     end
 
@@ -547,6 +612,14 @@ module Puppet::CloudPack
           raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
         end
       end
+
+      # Puppet enterprise install scripts, even those using S3, need and installer answer file.
+      if options[:install_script] =~ /^puppet-enterprise-/
+        unless options[:installer_answers]
+          raise "Must specify an answers file for install script #{options[:install_script]}"
+        end
+      end
+
       if options[:installer_payload]
         Puppet.notice "Uploading Puppet Enterprise tarball ..."
         scp.upload(options[:installer_payload], "#{options[:tmp_dir]}/puppet.tar.gz")
@@ -579,23 +652,6 @@ module Puppet::CloudPack
       ensure
         f.close
       end
-    end
-
-    def run_install_script(ssh, scp, tmp_install_script, tmp_dir, script, login)
-      Puppet.notice "Executing Puppet Install Script ..."
-
-      scp.upload(tmp_install_script, "#{tmp_dir}/#{script}.sh")
-      cmd = "bash -c 'chmod u+x #{tmp_dir}/#{script}.sh; #{tmp_dir}/#{script}.sh | tee #{tmp_dir}/install.log'"
-      result = ssh.run(login == 'root' ? cmd : "sudo #{cmd}" )
-      stdout = result[0].stdout
-      stderr = result[0].stderr
-      stdout.each_line do |r|
-        Puppet.debug(r)
-      end
-      stderr.each_line do |r|
-        Puppet.debug(r)
-      end
-      Puppet.notice "Executing Puppet Install Script ... Done"
     end
 
     def terminate(server, options)
