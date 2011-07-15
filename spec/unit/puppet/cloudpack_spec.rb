@@ -108,17 +108,15 @@ describe Puppet::CloudPack do
           @result = subject.list(:platform => 'AWS')
         end
         it 'should not be empty' do
-          # We actually get back something like this from Fog:
-          # ["ec2-368-5-559-12.compute-1.amazonaws.com", "ec2-14-92-246-64.compute-1.amazonaws.com"]
           @result.should_not be_empty
         end
-        it "should look like a list of DNS names" do
-          @result.each do |hostname|
-            hostname.should match(/^([a-zA-Z0-9-]+)$|^([a-zA-Z0-9-]+\.)+[a-zA-Z0-9-]+$/)
+        it "should look like a hash of identifiers" do
+          @result.each do |k,v|
+            k.should match(/^i-\w+/i)
           end
         end
-        it "should be a kind of Array" do
-          @result.should be_a_kind_of(Array)
+        it "should be a kind of Hash" do
+          @result.should be_a_kind_of(Hash)
         end
       end
     end
