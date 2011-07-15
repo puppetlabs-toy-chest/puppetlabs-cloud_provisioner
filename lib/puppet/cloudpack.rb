@@ -516,7 +516,7 @@ module Puppet::CloudPack
         retries += 1
         if retries > 10
           Puppet.err "Could not connect via SSH.  The error is: #{e}"
-          Puppet.err "This may be a result of the SSH public key for key #{:keyfile} not being installed into the authorized_keys file of the remote login account."
+          Puppet.err "This may be a result of the SSH public key for key #{keyfile} not being installed into the authorized_keys file of the remote login account."
           raise Puppet::Error, "Check your authentication credentials and try again."
         end
         retry
