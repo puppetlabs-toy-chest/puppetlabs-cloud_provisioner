@@ -111,6 +111,25 @@ describe Puppet::CloudPack do
         @ssh_mock = Fog::SSH::Mock.new('address', 'username', 'options')
         @scp_mock = Fog::SCP::Mock.new('local', 'remote', {})
       end
+      describe '#ssh_connect' do
+        it 'should use the correct options to make a connection' do
+          Fog::SSH.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@ssh_mock)
+          Fog::SCP.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@scp_mock)
+          @ssh_mock.expects(:run).with(['hostname'])
+          subject.ssh_connect('server', 'root', @keyfile.path)
+        end
+        it 'should be tolerant of exceptions' do
+          Fog::SSH.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@ssh_mock)
+          Fog::SCP.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@scp_mock)
+          @ssh_mock.expects(:run).with do |var| raise(Net::SSH::AuthenticationFailed, 'fails') end.with(['hostname'])
+          subject.ssh_connect('server', 'root', @keyfile.path)
+        end
+        it 'Exceptions eventually cause a failure' do
+          Fog::SSH.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@ssh_mock)
+          @ssh_mock.stubs(:run).with do |var| raise(Exception, 'fails') end
+          expect { subject.ssh_connect('server', 'root', @keyfile.path) }.should raise_error
+        end
+      end
     end
     describe '#terminate' do
       describe 'with valid arguments' do
