@@ -12,6 +12,13 @@ Puppet::Face.define :node, '0.0.1' do
     when_invoked do |options|
       Puppet::CloudPack.list(options)
     end
+    when_rendering :console do |value|
+      value.collect do |id,status_hash|
+        "#{id}:\n" + status_hash.collect do |field, val|
+          "  #{field}: #{val}"
+        end.sort.join("\n")
+      end.sort.join("\n")
+    end
   end
 end
 
