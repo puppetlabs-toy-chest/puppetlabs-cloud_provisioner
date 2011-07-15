@@ -103,116 +103,7 @@ describe Puppet::CloudPack do
         end
       end
     end
-    describe '#install' do
-      before :all do
-        @keyfile = Tempfile.open('private_key')
-        @keyfile.write('FOO')
-        @keyfile.close
-        @ssh_mock = Fog::SSH::Mock.new('address', 'username', 'options')
-        @scp_mock = Fog::SCP::Mock.new('local', 'remote', {})
-        # Mock out the connection that has a long timeout
-        Puppet::CloudPack.expects(:ssh_test_connect).with('server', 'root', @keyfile.path)
-      end
-      describe '#ssh_connect' do
-        it 'should use the correct options to make a connection' do
-          Fog::SSH.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@ssh_mock)
-          Fog::SCP.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@scp_mock)
-          subject.ssh_connect('server', 'root', @keyfile.path)
-        end
-        it 'should be tolerant of exceptions' do
-          pending "FIXME: These should now test #ssh_test_connect"
-          Fog::SSH.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@ssh_mock)
-          Fog::SCP.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@scp_mock)
-          subject.ssh_connect('server', 'root', @keyfile.path)
-        end
-        it 'Exceptions eventually cause a failure' do
-          pending "FIXME: These should now test #ssh_test_connect"
-          Fog::SSH.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@ssh_mock)
-          subject.stubs(:sleep)
-          @ssh_mock.stubs(:run).with do |var| raise(Net::SSH::AuthenticationFailed, 'fails') end
-          expect { subject.ssh_connect('server', 'root', @keyfile.path) }.should raise_error(Puppet::Error)
-        end
-      end
-      describe '#upload_payloads' do
-        it 'should not upload anything if nothing is specifed to upload' do
-          @scp_mock.expects(:upload).never
-          @result = subject.upload_payloads(
-            @scp_mock,
-            {}
-          )
-        end
-        it 'should upload answer file when specified' do
-          @scp_mock.expects(:upload).with('foo', "/tmp/puppet.answers")
-          @result = subject.upload_payloads(
-            @scp_mock,
-            {:installer_answers => 'foo', :tmp_dir => '/tmp'}
-          )
-        end
-        it 'should upload installer_payload when specified' do
-          @scp_mock.expects(:upload).with('foo', "/tmp/puppet.tar.gz")
-          @result = subject.upload_payloads(
-            @scp_mock,
-            {:installer_payload => 'foo', :tmp_dir => '/tmp'}
-          )
-        end
-        it 'should require installer payload when install-script is puppet-enterprise' do
-          expect do
-            subject.upload_payloads(
-              @scp_mock,
-              :install_script => 'puppet-enterprise',
-              :installer_answers => 'foo'
-            )
-          end.should raise_error Exception, /Must specify installer payload/
-        end
-        it 'should require installer answers when install-script is puppet-enterprise' do
-          expect do
-            subject.upload_payloads(
-              @scp_mock,
-              :install_script => 'puppet-enterprise',
-              :installer_payload => 'foo'
-            )
-          end.should raise_error Exception, /Must specify .*? answers file/
-        end
-      end
-      describe '#run install script' do
-        it 'should upload the script and execute it' do
-          pending "This needs to be tested once the remote ssh execute method is factored out into it's own location"
-          @scp_mock.expects(:upload).with('foo_file', "/tmp/foo.sh")
-          subject.run_install_script(
-            @ssh_mock, @scp_mock, 'foo_file', '/tmp', 'foo', 'root'
-          )
-        end
-        it 'should execte script with sudo when login is not root' do
-          pending "This needs to be tested once the remote ssh execute method is factored out into it's own location"
-          @ssh_mock.expects(:run).with("sudo bash -c 'chmod u+x /tmp/foo.sh; /tmp/foo.sh | tee /tmp/install.log'").returns([Fog::SSH::Mock::Result.new('foo')])
-          subject.run_install_script(
-            @ssh_mock, @scp_mock, 'foo_file', '/tmp', 'foo', 'dan'
-          )
-        end
-      end
-      describe '#compile_template' do
-        it 'should be able to compile a template' do
-          tmp_file = begin
-            tmp = Tempfile.open('foo')
-            tmp.write('Here is a <%= options[:variable] %>')
-            tmp.path
-          ensure
-            tmp.close
-          end
-          tmp_filename = File.basename(tmp_file)
-          tmp_basedir = File.join(File.dirname(tmp_file), 'scripts')
-          tmp_file_real = File.join(tmp_basedir, "#{tmp_filename}.erb")
-          FileUtils.mkdir_p(tmp_basedir)
-          FileUtils.mv(tmp_file, tmp_file_real)
-          Puppet[:confdir] = File.dirname(tmp_file)
-          @result = subject.compile_template(
-            :variable => 'variable',
-            :install_script => tmp_filename
-          )
-          File.read(@result).should == 'Here is a variable'
-        end
-      end
-    end
+
     describe '#terminate' do
       describe 'with valid arguments' do
         before :each do
@@ -283,7 +174,150 @@ describe Puppet::CloudPack do
         end
       end
     end
+  end
 
+  describe 'install helper methods' do
+    before :all do
+      @server = 'ec2-50-19-20-121.compute-1.amazonaws.com'
+      @login  = 'root'
+      @keyfile = Tempfile.open('private_key')
+      @keydata = 'FOOBARBAZ'
+      @keyfile.write(@keydata)
+      @keyfile.close
+    end
+    before :each do
+      @ssh_mock = Fog::SSH::Mock.new(@server, @login, 'options')
+      @scp_mock = Fog::SCP::Mock.new('local', 'remote', {})
+      @mock_connection_tuple = { :ssh => @ssh_mock, :scp => @scp_mock }
+    end
+    after :all do
+      File.unlink(@keyfile.path)
+    end
+    describe '#install' do
+      before :each do
+        @options = {
+          :keyfile           => @keyfile.path,
+          :login             => @login,
+          :server            => @server,
+          :install_script    => "puppet-enterprise-s3",
+          :installer_answers => "/Users/jeff/vms/moduledev/enterprise/answers_cloudpack.txt",
+        }
+        Puppet::CloudPack.expects(:ssh_connect).with(@server, @login, @keyfile.path).returns(@mock_connection_tuple)
+        Puppet::CloudPack.expects(:ssh_remote_execute).twice.with(any_parameters)
+      end
+      it 'should return a generated certname matching a guid' do
+        subject.install(@server, @options).should match(/[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}/)
+      end
+      it 'should return the specified certname' do
+        @options[:certname] = 'abc123'
+        subject.install(@server, @options).should eq 'abc123'
+      end
+    end
+    describe '#ssh_connect' do
+      before :each do
+        Puppet::CloudPack.expects(:ssh_test_connect).with(@server, @login, @keyfile.path).returns(true)
+      end
+      it 'should return Fog::SSH and Fog::SCP instances' do
+        Fog::SSH.expects(:new).with(@server, @login, {:key_data => [@keydata]}).returns(@ssh_mock)
+        Fog::SCP.expects(:new).with(@server, @login, {:key_data => [@keydata]}).returns(@scp_mock)
+        results = subject.ssh_connect(@server, @login, @keyfile.path)
+        results[:ssh].should be @ssh_mock
+        results[:scp].should be @scp_mock
+      end
+    end
+    describe '#ssh_test_connect' do
+      before :each do
+        subject.stubs(:sleep)
+      end
+      describe "with transient failures" do
+        it 'should be tolerant of ??? failures' do
+          pending 'Dan mentioned specific conditions which are unknown at this time.'
+        end
+        describe 'with Net:SSH::AuthenticationFailed failures' do
+          it 'should be tolerant of intermittent failures' do
+            Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Net::SSH::AuthenticationFailed, 'root').then.returns(true)
+            subject.ssh_test_connect('server', 'root', @keyfile.path)
+          end
+          it 'should fail eventually' do
+            Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Net::SSH::AuthenticationFailed, 'root')
+            expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.should raise_error(Puppet::Error, /auth/)
+          end
+        end
+      end
+      describe 'with general Exception failures' do
+        it 'should not be tolerant of intermittent errors' do
+          Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Exception, 'some error').then.returns(true)
+          expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.should raise_error(Exception, 'some error')
+        end
+        it 'should fail eventually ' do
+          Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Exception, 'some error')
+          expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.should raise_error(Exception, 'some error')
+        end
+      end
+    end
+    describe '#upload_payloads' do
+      it 'should not upload anything if nothing is specifed to upload' do
+        @scp_mock.expects(:upload).never
+        @result = subject.upload_payloads(
+          @scp_mock,
+          {}
+        )
+      end
+      it 'should upload answer file when specified' do
+        @scp_mock.expects(:upload).with('foo', "/tmp/puppet.answers")
+        @result = subject.upload_payloads(
+          @scp_mock,
+          {:installer_answers => 'foo', :tmp_dir => '/tmp'}
+        )
+      end
+      it 'should upload installer_payload when specified' do
+        @scp_mock.expects(:upload).with('foo', "/tmp/puppet.tar.gz")
+        @result = subject.upload_payloads(
+          @scp_mock,
+          {:installer_payload => 'foo', :tmp_dir => '/tmp'}
+        )
+      end
+      it 'should require installer payload when install-script is puppet-enterprise' do
+        expect do
+          subject.upload_payloads(
+            @scp_mock,
+            :install_script => 'puppet-enterprise',
+            :installer_answers => 'foo'
+          )
+        end.should raise_error Exception, /Must specify installer payload/
+      end
+      it 'should require installer answers when install-script is puppet-enterprise' do
+        expect do
+          subject.upload_payloads(
+            @scp_mock,
+            :install_script => 'puppet-enterprise',
+            :installer_payload => 'foo'
+          )
+        end.should raise_error Exception, /Must specify .*? answers file/
+      end
+    end
+    describe '#compile_template' do
+      it 'should be able to compile a template' do
+        tmp_file = begin
+          tmp = Tempfile.open('foo')
+          tmp.write('Here is a <%= options[:variable] %>')
+          tmp.path
+        ensure
+          tmp.close
+        end
+        tmp_filename = File.basename(tmp_file)
+        tmp_basedir = File.join(File.dirname(tmp_file), 'scripts')
+        tmp_file_real = File.join(tmp_basedir, "#{tmp_filename}.erb")
+        FileUtils.mkdir_p(tmp_basedir)
+        FileUtils.mv(tmp_file, tmp_file_real)
+        Puppet[:confdir] = File.dirname(tmp_file)
+        @result = subject.compile_template(
+          :variable => 'variable',
+          :install_script => tmp_filename
+        )
+        File.read(@result).should == 'Here is a variable'
+      end
+    end
   end
 
   describe 'helper functions' do

@@ -495,45 +495,75 @@ module Puppet::CloudPack
 
     def install(server, options)
 
-      # FIXME We shouldn't try to connect if the answers file hasn't been provided
-      # for the installer script matching puppet-enterprise-* (e.g. puppet-enterprise-s3)
-
-      connections = ssh_connect(server, options[:login], options[:keyfile])
-
-      # command for creating cross-ditro tmp dirs
-      options[:tmp_dir] = connections[:ssh].run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
-
-      # This requires the "guid" gem
       options[:certname] ||= Guid.new.to_s
 
+      # FIXME We shouldn't try to connect if the answers file hasn't been provided
+      # for the installer script matching puppet-enterprise-* (e.g. puppet-enterprise-s3)
+      connections = ssh_connect(server, options[:login], options[:keyfile])
+
+      options[:tmp_dir] = File.join('/', 'tmp', Guid.new.to_s)
+      create_tmpdir_cmd = "mkdir #{options[:tmp_dir]}"
+      ssh_remote_execute(server, options[:login], create_tmpdir_cmd, options[:keyfile])
+
       upload_payloads(connections[:scp], options)
+
       tmp_script_path = compile_template(options)
-      run_install_script(connections[:ssh], connections[:scp], tmp_script_path, options[:tmp_dir], options[:install_script], options[:login])
+
+      remote_script_path = File.join(options[:tmp_dir], "#{options[:install_script]}.sh")
+      connections[:scp].upload(tmp_script_path, remote_script_path)
+
+      # Finally, execute the installer script
+      install_command = "bash -c 'chmod u+x #{remote_script_path}; #{remote_script_path}'"
+      ssh_remote_execute(server, options[:login], install_command, options[:keyfile])
+
       options[:certname]
+    end
+
+    # This is the single place to make SSH calls.  It will handle collecting STDOUT
+    # in a line oriented manner, printing it to debug log destination and checking the
+    # exit code of the remote call.  This should also make it much easier to do unit testing on
+    # all of the other methods that need this functionality.  Finally, it should provide
+    # one place to swap out the back end SSH implementation if need be.
+    def ssh_remote_execute(server, login, command, keyfile = nil)
+      Puppet.info "Executing remote command ..."
+      Puppet.debug "Command: #{command}"
+      buffer = String.new
+      exit_code = nil
+      Net::SSH.start(server, login, :keys => [ keyfile ]) do |session|
+        session.open_channel do |channel|
+          channel.on_data do |ch, data|
+            buffer << data
+            if buffer =~ /\n/
+              lines = buffer.split("\n")
+              buffer = lines.length > 1 ? lines.pop : String.new
+              lines.each do |line|
+                Puppet.debug(line)
+              end
+            end
+          end
+          channel.on_eof do |ch|
+            # Display anything remaining in the buffer
+            unless buffer.empty?
+              Puppet.debug(buffer)
+            end
+          end
+          channel.on_request("exit-status") do |ch, data|
+            exit_code = data.read_long
+            Puppet.debug("SSH Command Exit Code: #{exit_code}")
+          end
+          # Finally execute the command
+          channel.exec(command)
+        end
+      end
+      Puppet.info "Executing remote command ... Done"
+      exit_code
     end
 
     def ssh_test_connect(server, login, keyfile = nil)
       Puppet.notice "Waiting for SSH response ..."
       retries = 0
       begin
-        # This block tries to execute the date command on the remote system
-        # Executing the date command seems like a reasonable test if the system
-        # is ready or not.
-        Net::SSH.start(server, login, :keys => [ keyfile ]) do |session|
-          session.open_channel do |channel|
-            channel.on_data do |ch, data|
-              data.chomp!
-              Puppet.debug("SSH Response: #{data} (This should look like a timestamp)")
-            end
-            #http://groups.google.com/group/comp.lang.ruby/browse_thread/thread/a806b0f5dae4e1e2
-            channel.on_request("exit-status") do |ch, data|
-              exit_code = data.read_long
-              Puppet.debug("SSH Response exit code: #{exit_code}")
-            end
-            # Finally execute the date command
-            channel.exec "date"
-          end
-        end
+        ssh_remote_execute(server, login, "date", keyfile)
       rescue Net::SSH::AuthenticationFailed => e
         Puppet.info "Got an SSH authentication failure (Retry #{retries}), this may be because the machine is booting. (Sleeping for 5 seconds)"
         sleep 5
@@ -543,12 +573,6 @@ module Puppet::CloudPack
           Puppet.err "This may be a result of the SSH public key for key #{keyfile} not being installed into the authorized_keys file of the remote login account."
           raise Puppet::Error, "Check your authentication credentials and try again."
         end
-        retry
-      rescue => e
-        sleep 5
-        retries += 1
-        Puppet.notice "Still waiting for SSH response ... (Retry #{retries})"
-        raise "SSH not responding; aborting." if retries > 60
         retry
       end
       Puppet.notice "Waiting for SSH response ... Done"
@@ -613,34 +637,6 @@ module Puppet::CloudPack
       ensure
         f.close
       end
-    end
-
-    def run_install_script(ssh, scp, tmp_install_script, tmp_dir, script, login)
-      Puppet.notice "Executing Puppet Install Script ..."
-
-      scp.upload(tmp_install_script, "#{tmp_dir}/#{script}.sh")
-      cmd = "bash -c 'chmod u+x #{tmp_dir}/#{script}.sh; #{tmp_dir}/#{script}.sh'"
-
-      Net::SSH.start(server, login, :keys => [ options[:keyfile] ]) do |session|
-        session.open_channel do |channel|
-          channel.on_data do |ch, data|
-            data.chomp!
-            Puppet.debug(data)
-          end
-          #http://groups.google.com/group/comp.lang.ruby/browse_thread/thread/a806b0f5dae4e1e2
-          channel.on_request("exit-status") do |ch, data|
-            exit_code = data.read_long
-            if exit_code > 0
-              raise Puppet::Error, "Installation script #{options[:install_script]} failed with exit code #{exit_code}"
-            else
-              Puppet.notice("Exicuting Puppet Install Script ... Done (Success!)")
-            end
-          end
-          # Finally execute the date command
-          channel.exec(cmd)
-        end
-      end
-      Puppet.notice "Executing Puppet Install Script ... Done"
     end
 
     def terminate(server, options)
