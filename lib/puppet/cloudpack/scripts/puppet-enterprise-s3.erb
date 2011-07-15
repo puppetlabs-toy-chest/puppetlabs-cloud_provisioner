@@ -15,12 +15,19 @@ echo "Installation script has started..."
 echo "Downloading from https://puppetlabs.s3.amazonaws.com/pe/${payload}.tar.gz"
 
 # Download the installer payload from S3
-wget --progress=dot:mega "https://puppetlabs.s3.amazonaws.com/pe/${payload}.tar.gz"
+wget --progress=dot:mega "https://puppetlabs.s3.amazonaws.com/pe/${payload}.tar.gz" 2>&1
+
+echo "Uncompressing ${payload}.tar.gz ..."
 
 # copied by the install action of cloudpack
 tar -xzf "${payload}.tar.gz"
 
-grep -q '^q_puppetagent_certname' puppet.answers && (echo 'PE answers file already contains line q_puppetagent_certname';exit 1)
+if grep -q '^q_puppetagent_certname' puppet.answers; then
+  echo 'PE answers file already contains line q_puppetagent_certname'
+  exit 1
+fi
+
 echo "q_puppetagent_certname='<%= options[:certname] %>'" >> puppet.answers
 
 puppet-enterprise-${pe_version}-all/puppet-enterprise-installer -a puppet.answers
+
