@@ -138,14 +138,14 @@ describe Puppet::CloudPack do
             {}
           )
         end
-        it 'should install answer file when specified' do
+        it 'should upload answer file when specified' do
           @scp_mock.expects(:upload).with('foo', "/tmp/puppet.answers")
           @result = subject.upload_payloads(
             @scp_mock,
             {:installer_answers => 'foo', :tmp_dir => '/tmp'}
           )
         end
-        it 'should install installer_payload when specified' do
+        it 'should upload installer_payload when specified' do
           @scp_mock.expects(:upload).with('foo', "/tmp/puppet.tar.gz")
           @result = subject.upload_payloads(
             @scp_mock,
