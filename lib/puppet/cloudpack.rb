@@ -3,6 +3,7 @@ require 'rubygems'
 require 'guid'
 require 'fog'
 require 'puppet/network/http_pool'
+require 'net/ssh'
 
 module Puppet::CloudPack
   require 'puppet/cloudpack/installer'
@@ -492,20 +493,24 @@ module Puppet::CloudPack
     end
 
     def install(server, options)
-      login    = options[:login]
-      keyfile  = File.expand_path(options[:keyfile])
 
-      if options[:install_script] == 'puppet-enterprise'
-        unless options[:installer_payload] and options[:installer_answers]
-          raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
-        end
-      end
+      connections = ssh_connect(server, options[:login], options[:keyfile])
+
+      # command for creating cross-ditro tmp dirs
+      options[:tmp_dir] = connections[:ssh].run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
 
       # This requires the "guid" gem
-      certname = Guid.new.to_s
+      options[:certname] ||= Guid.new.to_s
 
+      upload_payloads(connections[:scp], options)
+      tmp_script_path = compile_template(options)
+      run_install_script(connections[:ssh], connections[:scp], tmp_script_path, options[:tmp_dir], options[:install_script], options[:login])
+      options[:certname]
+    end
+
+    def ssh_connect(server, login, keyfile = nil)
       opts = {}
-      opts[:key_data] = [File.read(keyfile)] if keyfile
+      opts[:key_data] = [File.read(File.expand_path(keyfile))] if keyfile
 
       ssh = Fog::SSH.new(server, login, opts)
       scp = Fog::SCP.new(server, login, opts)
@@ -521,7 +526,7 @@ module Puppet::CloudPack
         retries += 1
         if retries > 10
           Puppet.err "Could not connect via SSH.  The error is: #{e}"
-          Puppet.err "This may be a result of the SSH public key for key #{options[:keyfile]} not being installed into the authorized_keys file of the remote login account."
+          Puppet.err "This may be a result of the SSH public key for key #{keyfile} not being installed into the authorized_keys file of the remote login account."
           raise Puppet::Error, "Check your authentication credentials and try again."
         end
         retry
@@ -533,43 +538,50 @@ module Puppet::CloudPack
         retry
       end
       Puppet.notice "Waiting for SSH response ... Done"
+      {:ssh => ssh, :scp => scp}
+    end
 
-      # command for creating cross-ditro tmp dirs
-      tmp_dir = ssh.run("bash -c 'TMP_DIR=/tmp/installer_script.$(echo $RANDOM); mkdir $TMP_DIR; echo $TMP_DIR'")[0].stdout.chomp
-
+    def upload_payloads(scp, options)
+      if options[:install_script] == 'puppet-enterprise'
+        unless options[:installer_payload] and options[:installer_answers]
+          raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
+        end
+      end
       if options[:installer_payload]
         Puppet.notice "Uploading Puppet Enterprise tarball ..."
-        scp.upload(options[:installer_payload], "#{tmp_dir}/puppet.tar.gz")
+        scp.upload(options[:installer_payload], "#{options[:tmp_dir]}/puppet.tar.gz")
         Puppet.notice "Uploading Puppet Enterprise tarball ... Done"
       end
 
       if options[:installer_answers]
         Puppet.info "Uploading Puppet Answer File ..."
-        scp.upload(options[:installer_answers], "#{tmp_dir}/puppet.answers")
+        scp.upload(options[:installer_answers], "#{options[:tmp_dir]}/puppet.answers")
         Puppet.info "Uploading Puppet Answer File ... Done"
       end
+    end
 
+    def compile_template(options)
       Puppet.notice "Installing Puppet ..."
-      options[:certname] = certname
-      options[:tmp_dir] = tmp_dir
       options[:server] = Puppet[:server]
       options[:environment] = Puppet[:environment] || 'production'
+      options[:install_script] ||= 'foss'
 
-      script   = options[:install_script] || 'foss'
-      install_script = Puppet::CloudPack::Installer.build_installer_template(script, options)
+      install_script = Puppet::CloudPack::Installer.build_installer_template(options[:install_script], options)
       Puppet.debug("Compiled installation script:")
       Puppet.debug(install_script)
 
       # create a temp file to write compiled script
-      # capture the name of the path as tmp_install_script
-      tmp_install_script = begin
+      # return the path of the temp location of the script
+      begin
         f = Tempfile.open('install_script')
         f.write(install_script)
         f.path
       ensure
         f.close
       end
+    end
 
+    def run_install_script(ssh, scp, tmp_install_script, tmp_dir, script, login)
       Puppet.notice "Executing Puppet Install Script ..."
 
       scp.upload(tmp_install_script, "#{tmp_dir}/#{script}.sh")
@@ -584,8 +596,6 @@ module Puppet::CloudPack
         Puppet.debug(r)
       end
       Puppet.notice "Executing Puppet Install Script ... Done"
-
-      return certname
     end
 
     def terminate(server, options)
