@@ -3,6 +3,7 @@ require 'rubygems'
 require 'guid'
 require 'fog'
 require 'puppet/network/http_pool'
+require 'net/ssh'
 
 module Puppet::CloudPack
   require 'puppet/cloudpack/installer'
