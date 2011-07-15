@@ -494,6 +494,10 @@ module Puppet::CloudPack
 
       upload_payloads(connections[:scp], options)
       tmp_script_path = compile_template(options)
+      run_install_script(connections[:ssh], connections[:scp], tmp_script_path, options[:tmp_dir], options[:install_script], options[:login])
+      options[:certname]
+    end
+
     def ssh_connect(server, login, keyfile = nil)
       opts = {}
       opts[:key_data] = [File.read(File.expand_path(keyfile))] if keyfile
@@ -567,6 +571,7 @@ module Puppet::CloudPack
       end
     end
 
+    def run_install_script(ssh, scp, tmp_install_script, tmp_dir, script, login)
       Puppet.notice "Executing Puppet Install Script ..."
 
       scp.upload(tmp_install_script, "#{tmp_dir}/#{script}.sh")
@@ -581,8 +586,6 @@ module Puppet::CloudPack
         Puppet.debug(r)
       end
       Puppet.notice "Executing Puppet Install Script ... Done"
-
-      return certname
     end
 
     def terminate(server, options)
