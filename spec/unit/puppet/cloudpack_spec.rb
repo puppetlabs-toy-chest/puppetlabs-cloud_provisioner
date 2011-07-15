@@ -121,6 +121,8 @@ describe Puppet::CloudPack do
         it 'should be tolerant of exceptions' do
           Fog::SSH.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@ssh_mock)
           Fog::SCP.expects(:new).with('server', 'root', {:key_data => ['FOO']}).returns(@scp_mock)
+          # this expectation varifies that it allows for failures on the first try
+          # and does not raise exceptions when the second call does not fail
           @ssh_mock.expects(:run).with do |var| raise(Net::SSH::AuthenticationFailed, 'fails') end.with(['hostname'])
           subject.ssh_connect('server', 'root', @keyfile.path)
         end
