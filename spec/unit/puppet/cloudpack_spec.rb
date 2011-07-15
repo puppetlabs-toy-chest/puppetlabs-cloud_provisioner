@@ -171,6 +171,28 @@ describe Puppet::CloudPack do
           end.should raise_error Exception, /Must specify .*? answers file/
         end
       end
+      describe '#compile_template' do
+        it 'should be able to compile a template' do
+          tmp_file = begin
+            tmp = Tempfile.open('foo')
+            tmp.write('Here is a <%= options[:variable] %>')
+            tmp.path
+          ensure
+            tmp.close
+          end
+          tmp_filename = File.basename(tmp_file)
+          tmp_basedir = File.join(File.dirname(tmp_file), 'scripts')
+          tmp_file_real = File.join(tmp_basedir, "#{tmp_filename}.erb")
+          FileUtils.mkdir_p(tmp_basedir)
+          FileUtils.mv(tmp_file, tmp_file_real)
+          Puppet[:confdir] = File.dirname(tmp_file)
+          @result = subject.compile_template(
+            :variable => 'variable',
+            :install_script => tmp_filename
+          )
+          File.read(@result).should == 'Here is a variable'
+        end
+      end
     end
     describe '#terminate' do
       describe 'with valid arguments' do
