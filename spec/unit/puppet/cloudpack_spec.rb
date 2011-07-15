@@ -1,6 +1,33 @@
 require 'spec_helper'
 require 'puppet/cloudpack'
 
+module Fog
+  module SSH
+    class Mock
+      def run(commands)
+        commands.collect do |command|
+          Result.new(command)
+        end
+      end
+      class Result
+        attr_accessor :command, :stderr, :stdout, :status
+        def initialize(command)
+          @command = command
+          @stderr = command
+          @stdout = command
+        end
+      end
+    end
+  end
+  module SCP
+    class Mock
+      def upload(local_path, remote_path, upload_options = {})
+        nil
+      end
+    end
+  end
+end
+
 describe Puppet::CloudPack do
   before(:all) { @stdout, $stdout = $stdout, StringIO.new(@buffer = '') }
   after(:all)  { $stdout = @stdout }
