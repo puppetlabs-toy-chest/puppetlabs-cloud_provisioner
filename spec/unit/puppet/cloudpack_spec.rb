@@ -103,7 +103,15 @@ describe Puppet::CloudPack do
         end
       end
     end
-
+    describe '#install' do
+      before :all do
+        @keyfile = Tempfile.open('private_key')
+        @keyfile.write('FOO')
+        @keyfile.close
+        @ssh_mock = Fog::SSH::Mock.new('address', 'username', 'options')
+        @scp_mock = Fog::SCP::Mock.new('local', 'remote', {})
+      end
+    end
     describe '#terminate' do
       describe 'with valid arguments' do
         before :each do
