@@ -516,6 +516,7 @@ module Puppet::CloudPack
 
       # Finally, execute the installer script
       install_command = "bash -c 'chmod u+x #{remote_script_path}; #{remote_script_path}'"
+      install_command = options[:login] == 'root' ? install_command : 'sudo ' + install_command
       ssh_remote_execute(server, options[:login], install_command, options[:keyfile])
 
       options[:certname]
