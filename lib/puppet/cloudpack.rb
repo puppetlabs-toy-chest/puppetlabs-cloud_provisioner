@@ -14,7 +14,7 @@ module Puppet::CloudPack
     # defaults, so they all call merge_default_options() to ensure the keys are
     # set.
     def merge_default_options(options)
-      default_options = { :region => 'us-east-1', :platform => 'AWS' }
+      default_options = { :region => 'us-east-1', :platform => 'AWS', :install_script => 'gems' }
       default_options.merge(options)
     end
 
@@ -246,7 +246,7 @@ module Puppet::CloudPack
         summary 'Name of the template to use for installation'
         description <<-EOT
           Name of the template to use for installation. The current
-          list of supported templates is: foss, puppet-enterprise
+          list of supported templates is: gems, puppet-enterprise
         EOT
       end
 
@@ -495,6 +495,8 @@ module Puppet::CloudPack
 
     def install(server, options)
 
+      options = merge_default_options(options)
+
       options[:certname] ||= Guid.new.to_s
 
       # FIXME We shouldn't try to connect if the answers file hasn't been provided
@@ -607,6 +609,8 @@ module Puppet::CloudPack
     end
 
     def upload_payloads(scp, options)
+      options = merge_default_options(options)
+
       if options[:install_script] == 'puppet-enterprise'
         unless options[:installer_payload] and options[:installer_answers]
           raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
@@ -635,9 +639,9 @@ module Puppet::CloudPack
 
     def compile_template(options)
       Puppet.notice "Installing Puppet ..."
+      options = merge_default_options(options)
       options[:server] = Puppet[:server]
       options[:environment] = Puppet[:environment] || 'production'
-      options[:install_script] ||= 'foss'
 
       install_script = Puppet::CloudPack::Installer.build_installer_template(options[:install_script], options)
       Puppet.debug("Compiled installation script:")

@@ -321,6 +321,38 @@ describe Puppet::CloudPack do
   end
 
   describe 'helper functions' do
+    before :each do
+      @login   = 'root'
+      @server  = 'ec2-75-101-189-165.compute-1.amazonaws.com'
+      @keyfile = Tempfile.open('private_key')
+      @keydata = 'FOOBARBAZ'
+      @keyfile.write(@keydata)
+      @keyfile.close
+      @options = {
+        :keyfile           => @keyfile.path,
+        :login             => @login,
+        :server            => @server,
+        :install_script    => "puppet-enterprise-s3",
+        :installer_answers => "/Users/jeff/vms/moduledev/enterprise/answers_cloudpack.txt",
+      }
+    end
+
+    describe '#merge_default_options' do
+      it 'should set the installer script' do
+        merged_options = subject.merge_default_options(@options)
+        merged_options.should include(:install_script)
+      end
+      it 'should set the installer script to gems when unset' do
+        (opts = @options.dup).delete(:install_script)
+        merged_options = subject.merge_default_options(opts)
+        merged_options[:install_script].should eq('gems')
+      end
+      it 'should allow the user to specify the install script' do
+        merged_options = subject.merge_default_options(@options)
+        merged_options[:install_script].should eq(@options[:install_script])
+      end
+    end
+
     describe '#create_connection' do
       it 'should create a new connection' do
         Fog::Compute.expects(:new).with(:provider => 'SomeProvider')
