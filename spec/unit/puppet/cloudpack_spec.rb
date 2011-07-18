@@ -212,6 +212,13 @@ describe Puppet::CloudPack do
         @options[:certname] = 'abc123'
         subject.install(@server, @options).should eq 'abc123'
       end
+      it 'should set server as public_dns_name option' do
+        subject.expects(:compile_template).with do |options|
+          options[:public_dns_name] == @server
+        end
+        subject.install(@server, @options)
+      end
+    end
     describe '#install - setting up install command' do
       before :each do
         @options = {

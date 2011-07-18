@@ -498,6 +498,7 @@ module Puppet::CloudPack
       options = merge_default_options(options)
 
       options[:certname] ||= Guid.new.to_s
+      options[:public_dns_name] = server
 
       # FIXME We shouldn't try to connect if the answers file hasn't been provided
       # for the installer script matching puppet-enterprise-* (e.g. puppet-enterprise-s3)
