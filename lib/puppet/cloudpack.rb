@@ -257,7 +257,7 @@ module Puppet::CloudPack
           passed to the Puppet installer script.
         EOT
         before_action do |action, arguments, options|
-          unless options[:puppet_version] =~ /^(\d+)\.(\d+)(\.(\d+))?$|^(\d)+\.(\d)+\.(\d+)([a-zA-Z][a-zA-Z0-9-]*)$/
+          unless options[:puppet_version] =~ /^(\d+)\.(\d+)(\.(\d+|x))?$|^(\d)+\.(\d)+\.(\d+)([a-zA-Z][a-zA-Z0-9-]*)|master$/
             raise ArgumentError, "Invaid Puppet version '#{options[:puppet_version]}'"
           end
         end
