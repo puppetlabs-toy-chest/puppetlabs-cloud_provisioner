@@ -89,5 +89,19 @@ describe Puppet::Face[:node, :current] do
       end
 
     end
+    describe '(puppet-version)' do
+      ['2.7.x', 'master', '2.6.9'].each do |version|
+        it "should accept valid value #{version}" do
+          opts = @options.update :puppet_version => version
+          opts[:puppet_version].should == version
+          Puppet::CloudPack.expects(:install)
+          subject.install('server', @options)
+        end
+      end
+      it 'should fail when invalid versions are specified' do
+        opts = @options.update :puppet_version => '1.2.3.4'
+        expect { subject.install('server', opts) }.to raise_error(ArgumentError, /Invaid Puppet version/)
+      end
+    end
   end
 end

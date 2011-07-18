@@ -257,7 +257,7 @@ module Puppet::CloudPack
           passed to the Puppet installer script.
         EOT
         before_action do |action, arguments, options|
-          unless options[:puppet_version] =~ /^(\d+)\.(\d+)(\.(\d+))?$|^(\d)+\.(\d)+\.(\d+)([a-zA-Z][a-zA-Z0-9-]*)$/
+          unless options[:puppet_version] =~ /^(\d+)\.(\d+)(\.(\d+|x))?$|^(\d)+\.(\d)+\.(\d+)([a-zA-Z][a-zA-Z0-9-]*)|master$/
             raise ArgumentError, "Invaid Puppet version '#{options[:puppet_version]}'"
           end
         end
@@ -498,6 +498,7 @@ module Puppet::CloudPack
       options = merge_default_options(options)
 
       options[:certname] ||= Guid.new.to_s
+      options[:public_dns_name] = server
 
       # FIXME We shouldn't try to connect if the answers file hasn't been provided
       # for the installer script matching puppet-enterprise-* (e.g. puppet-enterprise-s3)
@@ -516,6 +517,7 @@ module Puppet::CloudPack
 
       # Finally, execute the installer script
       install_command = "bash -c 'chmod u+x #{remote_script_path}; #{remote_script_path}'"
+      install_command = options[:login] == 'root' ? install_command : 'sudo ' + install_command
       ssh_remote_execute(server, options[:login], install_command, options[:keyfile])
 
       options[:certname]

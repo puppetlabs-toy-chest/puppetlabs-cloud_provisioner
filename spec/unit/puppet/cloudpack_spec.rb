@@ -212,6 +212,53 @@ describe Puppet::CloudPack do
         @options[:certname] = 'abc123'
         subject.install(@server, @options).should eq 'abc123'
       end
+      it 'should set server as public_dns_name option' do
+        subject.expects(:compile_template).with do |options|
+          options[:public_dns_name] == @server
+        end
+        subject.install(@server, @options)
+      end
+    end
+    describe '#install - setting up install command' do
+      before :each do
+        @options = {
+          :keyfile           => @keyfile.path,
+          :server            => @server,
+        }
+      end
+      it 'should pre-pend sudo to command if login is not root' do
+        @options[:login] = 'dan'
+        Puppet::CloudPack.expects(:ssh_connect).with(@server, 'dan', @keyfile.path).returns(@mock_connection_tuple)
+        @is_command_valid = false
+        Puppet::CloudPack.expects(:ssh_remote_execute).twice.with do |server, login, command, keyfile|
+          if command =~ /^sudo bash -c 'chmod u\+x \S+gems\.sh; \S+gems\.sh'/
+            # set that the command is valid when it matches the regex
+            # the test will pass is this is set to true
+            @is_command_valid = true
+          else
+            true
+          end
+        end
+        subject.install(@server, @options)
+        @is_command_valid.should be_true
+      end
+      it 'should not add sudo to command when login is root' do
+        @options[:login] = 'root'
+        Puppet::CloudPack.expects(:ssh_connect).with(@server, 'root', @keyfile.path).returns(@mock_connection_tuple)
+        @is_command_valid = false
+        Puppet::CloudPack.expects(:ssh_remote_execute).twice.with do |server, login, command, keyfile|
+          if command =~ /^bash -c 'chmod u\+x \S+gems\.sh; \S+gems\.sh'/
+            # set that the command is valid when it matches the regex
+            # the test will pass is this is set to true
+            @is_command_valid = true
+          else
+            # return true for all invocations of ssh_remote_execute
+            true
+          end
+        end
+        subject.install(@server, @options)
+        @is_command_valid.should be_true
+      end
     end
     describe '#ssh_connect' do
       before :each do
