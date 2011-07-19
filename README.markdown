@@ -1,5 +1,5 @@
-Puppet CloudPack
-================
+Puppet Cloud Provisioner
+========================
 
 Puppet Module to launch and manage Cloud instances.
 
@@ -8,12 +8,19 @@ This module requires Puppet 2.7.0 or later.
 Getting Started
 ===============
 
- * [Getting Started With CloudPack](http://docs.puppetlabs.com/guides/cloud_pack_getting_started.html)
+ * [Getting Started With Cloud Provisioner](http://docs.puppetlabs.com/guides/cloud_pack_getting_started.html)
+
+Reporting Issues
+----------------
+
+Please report any problems you have with the Cloud Provisioner module in the project page issue tracker at:
+
+ * [Cloud Provisioner Issues](http://projects.puppetlabs.com/projects/cloud-pack/issues)
 
 Getting Started with Amazon EC2
 ===============================
 
-Before launching instances with the CloudPack module, you'll need to register
+Before launching instances with the Cloud Provisioner module, you'll need to register
 with Amazon AWS and obtain your access credentials.
 
  * [Amazon Web Services Registration](http://www.amazon.com/gp/aws/registration/registration-form.html)
@@ -42,7 +49,7 @@ Required Gems
 
 Note, the rspec unit tests currently have problems with Fog 0.9.0, but the
 command line actions themselves appear to work.  If you have problems with
-Cloud Pack, please try the specific version of Fog.  You may install 0.7.2
+Cloud Provisioner, please try the specific version of Fog.  You may install 0.7.2
 using the following command:
 
     gem install fog -v 0.7.2 --no-ri --no-rdoc
@@ -52,12 +59,15 @@ AMI Image
 
 Picking an AMI image can be daunting.  There are a lot of them out there.
 
-During development of Cloud Pack, I often used the following CentOS image which
-is compatible with [free tier] amazon instances:
+During development of Cloud Provisioner, I often used the following CentOS image which
+is compatible with [AWS Free Usage Tier][free tier] amazon instances:
 
  * ami-2342a94a (US-East region) CentOS 5 (Login: root)
  * ami-25df8e60 (US-West region) CentOS 5 (Login: root)
 
+A Ubuntu based AMI in the East region also works well with the [AWS Free Usage Tier][free tier] Amazon instances:
+
+ * ami-06ad526f (US-East region) Ubuntu (Login: ubuntu)
 
 Launching EC2 Instances
 =======================
@@ -127,18 +137,19 @@ The [Puppet Module Tool](https://github.com/puppetlabs/puppet-module-tool) may
 be used to build an installable package of this Puppet Module.
 
     $ puppet-module build
-    ======================================================
-    Building /Users/jeff/src/modules/cloudpack for release
-    ------------------------------------------------------
-    Done. Built: pkg/puppetlabs-cloudpack-0.0.1.tar.gz
+    ==============================================================
+    Building /Users/jeff/src/modules/cloud-provisioner for release
+    --------------------------------------------------------------
+    Done. Built: pkg/puppetlabs-cloud-provisioner-0.0.1git-95-g6541187.tar.gz
 
 To install the packaged module:
 
     $ cd <modulepath> (usually /etc/puppet/modules)
-    $ puppet-module install ~/src/modules/cloudpack/pkg/puppetlabs-cloudpack-0.0.1.tar.gz
-    Installed "puppetlabs-cloudpack-0.0.1" into directory: cloudpack
+    $ puppet-module install ~/src/modules/cloud-provisioner/pkg/puppetlabs-cloud-provisioner-0.0.1git-95-g6541187.tar.gz
+    Installed "puppetlabs-cloud-provisioner-0.0.1git-95-g6541187.tar.gz" into directory: cloud-provisioner
 
 External Documentation
+======================
 
  * [free tier]: http://aws.amazon.com/free/ "AWS Free Usage Tier"
 
