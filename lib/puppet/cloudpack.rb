@@ -295,7 +295,6 @@ module Puppet::CloudPack
     def add_classify_options(action)
       action.option '--node-group=', '--as=' do
         summary 'The Puppet Dashboard node group to add to.'
-        required
       end
     end
 
@@ -310,6 +309,14 @@ module Puppet::CloudPack
     end
 
     def classify(certname, options)
+      if options[:node_group]
+        dashboard_classify(certname, options)
+      else
+        Puppet.info('No classification method selected')
+      end
+    end
+
+    def dashboard_classify(certname, options)
       Puppet.info "Using http://#{Puppet[:report_server]}:#{Puppet[:report_port]} as Dashboard."
       http = Puppet::Network::HttpPool.http_instance(Puppet[:report_server], Puppet[:report_port])
 

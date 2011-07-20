@@ -9,14 +9,15 @@ describe Puppet::Face[:node, :current] do
   end
 
   describe 'option validation' do
-    before :each do
-      Puppet::CloudPack.expects(:classify).never
-    end
-
     describe '(node-group)' do
-      it 'should require a provider' do
+      it 'should not call dashboard_classify if node_group is not supplied' do
         @options.delete(:node_group)
-        expect { subject.classify('server', @options) }.to raise_error ArgumentError, /required/
+        subject.expects(:dashboard_classify).never
+        subject.classify('server', @options)
+      end
+      it 'should call dashboard_classify if a node_group is specified' do
+        Puppet::CloudPack.expects(:dashboard_classify).with('server', @options).once
+        subject.classify('server', @options)
       end
     end
   end
