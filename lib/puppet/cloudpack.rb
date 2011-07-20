@@ -475,7 +475,7 @@ module Puppet::CloudPack
       certname = install(server, options)
       options.delete(:_destroy_server_at_exit)
 
-      Puppet.notice "Puppet Enterprise is now installed on: #{server}"
+      Puppet.notice "Puppet is now installed on: #{server}"
 
       classify(certname, options)
 
