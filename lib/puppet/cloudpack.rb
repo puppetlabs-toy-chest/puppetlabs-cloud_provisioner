@@ -302,10 +302,8 @@ module Puppet::CloudPack
 
 
     def bootstrap(options)
-      options[:_destroy_server_at_exit] = :bootstrap
       server = self.create(options)
       self.init(server, options)
-      options.delete(:_destroy_server_at_exit)
       return nil
     end
 
