@@ -5,6 +5,7 @@ require 'fog'
 require 'net/ssh'
 require 'puppet/network/http_pool'
 require 'net/ssh'
+require 'timeout'
 
 module Puppet::CloudPack
   require 'puppet/cloudpack/installer'
@@ -295,7 +296,6 @@ module Puppet::CloudPack
     def add_classify_options(action)
       action.option '--node-group=', '--as=' do
         summary 'The Puppet Dashboard node group to add to.'
-        required
       end
     end
 
@@ -310,6 +310,14 @@ module Puppet::CloudPack
     end
 
     def classify(certname, options)
+      if options[:node_group]
+        dashboard_classify(certname, options)
+      else
+        Puppet.info('No classification method selected')
+      end
+    end
+
+    def dashboard_classify(certname, options)
       Puppet.info "Using http://#{Puppet[:report_server]}:#{Puppet[:report_port]} as Dashboard."
       http = Puppet::Network::HttpPool.http_instance(Puppet[:report_server], Puppet[:report_port])
 
@@ -467,7 +475,7 @@ module Puppet::CloudPack
       certname = install(server, options)
       options.delete(:_destroy_server_at_exit)
 
-      Puppet.notice "Puppet Enterprise is now installed on: #{server}"
+      Puppet.notice "Puppet is now installed on: #{server}"
 
       classify(certname, options)
 
@@ -569,7 +577,9 @@ module Puppet::CloudPack
       # We should only really block for 3 minutes or so.
       retries = 0
       begin
-        ssh_remote_execute(server, login, "date", keyfile)
+        status = Timeout::timeout(10) do
+          ssh_remote_execute(server, login, "date", keyfile)
+        end
       rescue Net::SSH::AuthenticationFailed, Errno::ECONNREFUSED => e
         if (retries += 1) > 10
           Puppet.err "Could not connect via SSH.  The error is: #{e}"
@@ -589,6 +599,15 @@ module Puppet::CloudPack
         else
           Puppet.info "Failed to connect with issue #{e} (Retry #{retries})"
           Puppet.info "This may be because the machine is booting.  Retrying the connection..."
+        end
+      rescue Timeout::Error => e
+        if (retries += 1) > 5
+          Puppet.err "Could not connect via SSH.  The error is: #{e}"
+          raise Puppet::Error, "Too many timeouts trying to connect."
+        else
+          Puppet.info "Connection test timed-out: (Retry #{retries})"
+          Puppet.info "This may be because the machine is booting.  Retrying the connection..."
+          retry
         end
       rescue Exception => e
         Puppet.err("Unhandled connection robustness error: #{e.class} [#{e.inspect}]")

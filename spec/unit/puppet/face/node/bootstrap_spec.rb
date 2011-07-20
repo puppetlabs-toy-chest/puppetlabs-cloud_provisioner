@@ -67,11 +67,5 @@ describe Puppet::Face[:node, :current] do
       end
     end
 
-    describe '(node-group)' do
-      it 'should require a provider' do
-        @options.delete(:node_group)
-        expect { subject.bootstrap(@options) }.to raise_error ArgumentError, /required/
-      end
-    end
   end
 end
