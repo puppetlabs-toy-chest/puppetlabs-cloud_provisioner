@@ -1,5 +1,5 @@
 name 'puppetlabs-cloud-provisioner'
-version '0.0.1'
+version '0.6.0rc1'
 source 'git://github.com/puppetlabs/puppetlabs-cloud-provisioner.git'
 author 'puppetlabs'
 license 'Apache Version 2.0'

@@ -3,7 +3,7 @@ Puppet Cloud Provisioner
 
 Puppet Module to launch and manage Cloud instances.
 
-This module requires Puppet 2.7.0 or later.
+This module requires Puppet 2.7.2 or later.
 
 Getting Started
 ===============
@@ -64,6 +64,10 @@ is compatible with [AWS Free Usage Tier][free tier] amazon instances:
 
  * ami-2342a94a (US-East region) CentOS 5 (Login: root)
  * ami-25df8e60 (US-West region) CentOS 5 (Login: root)
+
+NOTE: These CentOS AMI's are from rightscale and are configured to use their
+YUM and GEM mirrors.  As a result, they often contain out of date software
+libraries.
 
 A Ubuntu based AMI in the East region also works well with the [AWS Free Usage Tier][free tier] Amazon instances:
 

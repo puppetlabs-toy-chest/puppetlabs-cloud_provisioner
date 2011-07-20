@@ -1,2 +1,34 @@
+2011-07-20 Jeff McCune <jeff@puppetlabs.com> - v0.6.0rc1
+* Initial public release
+* Add --type option to launch different EC2 instance sizes
+* (#7510) Add inline documentation for actions and options
+* (#8286) Warn if the payload used with the install action is not a tar.gz
+file
+* (#8265) Make the platform flag optional and default to 'AWS' (Note,
+puppet-provisioner provisions AWS EC2 instances in this release)
+* (#7511) Add the ability to launch instances in any EC2 region using the
+--region option.  The default region is us-east-1
+* (#8157) Improve the feedback of the terminate action by explicitly stating
+the instance has been terminated.
+* (#8185) Add a list action to list EC2 instances and their current status.
+* (#8343) Print the EC2 instance public DNS name as soon as it is available
+* (#8350) Change all output to use Puppet's configured log destination
+* (#8348) Add a fingerprint action to make a best effort to obtain the SSH
+public host key fingerprint from the launched EC2 instance.
+* (#7508) Add the ability to install Puppet using rubygems on a target system.
+* (#7508) Improve the install action using template scripts to install Puppet
+on launched systems.
+* (#8403) Replace dependency on uuidgen Mac OS X executable with guid gem.
+* (#8422) Catch the exit status of installation script and display an error if
+they're non zero.
+* (#8204) Include a puppet enterprise install script that downloads from S3.
+This should improve install times on low bandwidth connections.
+* (#8472) Add support for non-root logins when installing puppet on a target
+system.
+* (#8493) Rename cloudpack to cloud-provisioner
+* (#8513) Make puppet classification of node optional
+* (#8501) Improve the robustness of SSH connections to the target system
+* (#8517) Add ability to install Puppet Dashboard on the target system
+
 2011-06-29 Jeff McCune <jeff@puppetlabs.com> - 0.0.1
 * Initial tag.  This is not an official release.
