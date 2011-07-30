@@ -79,34 +79,6 @@ describe Puppet::Face[:node, :current] do
       end
     end
 
-    describe '(security-group)' do
-      it 'should split group names into an array' do
-        @options[:group] = %w[ A B C D E ].join(File::PATH_SEPARATOR)
-        subject.create(@options) rescue nil
-        @options[:group].should == %w[ A B C D E ]
-      end
-
-      it 'should validate all group names' do
-        @options[:group] = %w[ A B C ]
-        expect { subject.create(@options) }.to raise_error ArgumentError,
-          /unrecognized.*: #{@options[:group].join(', ')}/i
-      end
-    end
-
-    describe '(security-group)' do
-      it 'should split group names into an array' do
-        @options[:group] = %w[ A B C D E ].join(File::PATH_SEPARATOR)
-        subject.create(@options) rescue nil
-        @options[:group].should == %w[ A B C D E ]
-      end
-
-      it 'should validate all group names' do
-        @options[:group] = %w[ A B C ]
-        expect { subject.create(@options) }.to raise_error ArgumentError,
-          /unrecognized.*: #{@options[:group].join(', ')}/i
-      end
-    end
-
     describe '(region)' do
       it "should set the region to us-east-1 if no region is supplied" do
         @options.delete(:region)
@@ -124,6 +96,31 @@ describe Puppet::Face[:node, :current] do
         expect { subject.create(@options) }.to raise_error ArgumentError, /one of/
       end
     end
+  end
 
+  describe 'option validation with create() Mock' do
+    describe '(security-group)' do
+      it 'should call group_option_before_action' do
+        @options[:group] = %w[ A B C D E ].join(File::PATH_SEPARATOR)
+        # This makes sure the before_action calls the group_option_before_action
+        # correctly with the options we've specified.
+        # We raise the exception to prevent the call to the create() action
+        # from happening.
+        Puppet::CloudPack.stubs(:group_option_before_action).with() do |options|
+          if options[:group] == @options[:group] then
+            raise Exception, 'group_option_before_action called correctly'
+          else
+            raise Exception, 'group_option_before_action called incorrectly'
+          end
+        end
+        expect { subject.create(@options) }.to raise_error Exception, /called correctly/
+      end
+
+      it 'should validate all group names' do
+        @options[:group] = %w[ A B C ]
+        expect { subject.create(@options) }.to raise_error ArgumentError,
+          /unrecognized.*: #{@options[:group].join(', ')}/i
+      end
+    end
   end
 end

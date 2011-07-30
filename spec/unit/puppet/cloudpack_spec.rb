@@ -428,4 +428,28 @@ describe Puppet::CloudPack do
       end
     end
   end
+
+  describe 'option parsing helper functions' do
+    before :each do
+      @options = {
+        :platform => 'AWS',
+        :image    => 'ami-12345',
+        :type     => 'm1.small',
+        :keypair  => 'some_keypair',
+        :region   => 'us-east-1',
+      }
+    end
+    it 'should split a group string on the path separator' do
+      @options[:group] = %w[ A B C D E ].join(File::PATH_SEPARATOR)
+      Puppet::CloudPack.stubs(:create_connection).with() do |options|
+        if options[:group] == %w[ A B C D E ] then
+          raise Exception, 'group was split as expected'
+        else
+          raise Exception, 'group was not split as expected'
+        end
+      end
+      expect { Puppet::CloudPack.group_option_before_action(@options) }.to raise_error Exception, /was split as expected/
+    end
+
+  end
 end
