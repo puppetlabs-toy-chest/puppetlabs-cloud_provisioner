@@ -294,7 +294,6 @@ module Puppet::CloudPack
           end
         end
       end
-
     end
 
     def add_classify_options(action)
@@ -302,8 +301,6 @@ module Puppet::CloudPack
         summary 'The Puppet Dashboard node group to add to.'
       end
     end
-
-
 
     def bootstrap(options)
       server = self.create(options)

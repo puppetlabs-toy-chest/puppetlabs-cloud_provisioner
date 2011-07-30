@@ -4,7 +4,7 @@ require 'puppet/cloudpack'
 describe Puppet::Face[:node, :current] do
   before :each do
     @options = {
-      :node_group => 'webserver'
+      :node_group => 'webserver',
     }
   end
 
