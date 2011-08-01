@@ -64,6 +64,18 @@ module Puppet::CloudPack
       end
     end
 
+    # JJM This method is separated from the before_action block to aid testing.
+    def group_option_before_action(options)
+      options[:group] = options[:group].split(File::PATH_SEPARATOR) unless options[:group].is_a? Array
+      options = Puppet::CloudPack.merge_default_options(options)
+
+      known = Puppet::CloudPack.create_connection(options).security_groups
+      unknown = options[:group].select { |g| known.get(g).nil? }
+      unless unknown.empty?
+        raise ArgumentError, "Unrecognized security groups: #{unknown.join(', ')}"
+      end
+    end
+
     def add_create_options(action)
       add_platform_option(action)
       add_region_option(action)
@@ -131,15 +143,7 @@ module Puppet::CloudPack
           Multiple groups can be specified as a list using ':'.
         EOT
         before_action do |action, args, options|
-          options[:group] = options[:group].split(File::PATH_SEPARATOR) unless options[:group].is_a? Array
-
-          options = Puppet::CloudPack.merge_default_options(options)
-
-          known = Puppet::CloudPack.create_connection(options).security_groups
-          unknown = options[:group].select { |g| known.get(g).nil? }
-          unless unknown.empty?
-            raise ArgumentError, "Unrecognized security groups: #{unknown.join(', ')}"
-          end
+          Puppet::CloudPack.group_option_before_action(options)
         end
       end
     end
@@ -290,7 +294,6 @@ module Puppet::CloudPack
           end
         end
       end
-
     end
 
     def add_classify_options(action)
@@ -298,8 +301,6 @@ module Puppet::CloudPack
         summary 'The Puppet Dashboard node group to add to.'
       end
     end
-
-
 
     def bootstrap(options)
       server = self.create(options)
