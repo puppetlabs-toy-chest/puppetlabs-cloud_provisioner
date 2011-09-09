@@ -29,7 +29,7 @@ describe installer_klass do
       installer_klass.find_template(template_id).should == template_location
     end
     it 'should be able to use a lib version' do
-      installer_klass.find_template('puppet-enterprise').should == File.join(scripts_dir, 'puppet-enterprise.erb')
+      File.expand_path(installer_klass.find_template('puppet-enterprise')).should == File.join(scripts_dir, 'puppet-enterprise.erb')
     end
     it 'should fail when it cannot find a script' do
       now = Time.now.to_i
