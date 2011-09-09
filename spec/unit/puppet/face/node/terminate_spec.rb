@@ -41,7 +41,7 @@ describe Puppet::Face[:node, :current] do
 
       it 'should validate the region' do
         @options[:region] = 'mars-east-100'
-        expect { subject.terminate('server', @options) }.to raise_error ArgumentError, /one of/
+        expect { subject.terminate('server', @options) }.to raise_error ArgumentError, /Unknown region/
       end
     end
   end
