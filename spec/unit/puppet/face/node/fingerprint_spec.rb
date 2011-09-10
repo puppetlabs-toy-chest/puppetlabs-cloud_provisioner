@@ -3,7 +3,7 @@ require 'puppet/cloudpack'
 
 describe Puppet::Face[:node, :current] do
   before :all do
-    data = Fog::AWS::Compute::Mock.data['us-east-1'][Fog.credentials[:aws_access_key_id]]
+    data = Fog::Compute::AWS::Mock.data['us-east-1'][Fog.credentials[:aws_access_key_id]]
     data[:images]['ami-12345'] = { 'imageId' => 'ami-12345' }
     data[:key_pairs]['some_keypair'] = { 'keyName' => 'some_keypair' }
   end
