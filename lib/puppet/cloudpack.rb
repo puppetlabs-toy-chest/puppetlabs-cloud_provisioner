@@ -4,7 +4,6 @@ require 'guid'
 require 'fog'
 require 'net/ssh'
 require 'puppet/network/http_pool'
-require 'net/ssh'
 require 'timeout'
 
 module Puppet::CloudPack
