@@ -1,8 +1,8 @@
 require 'puppet/cloudpack'
 
-Puppet::Face.define :node, '0.0.1' do
+Puppet::Face.define :node_aws, '0.0.1' do
   action :terminate do
-    summary 'Terminates the machine instance'
+    summary 'Terminate an EC2 machine instance'
     description <<-EOT
       Terminates an instance.
       Accepts the instance name to terminate
