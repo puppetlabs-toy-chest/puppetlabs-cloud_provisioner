@@ -1,6 +1,6 @@
 require 'puppet/cloudpack'
 
-Puppet::Face.define :node, '0.0.1' do
+Puppet::Face.define :node_aws, '0.0.1' do
   action :create do
     summary 'Create a new EC2 machine instance.'
     description <<-EOT
