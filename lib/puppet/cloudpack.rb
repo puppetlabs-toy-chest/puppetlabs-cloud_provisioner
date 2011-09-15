@@ -575,7 +575,7 @@ module Puppet::CloudPack
       # We should only really block for 3 minutes or so.
       retries = 0
       begin
-        status = Timeout::timeout(10) do
+        status = Timeout::timeout(25) do
           ssh_remote_execute(server, login, "date", keyfile)
         end
       rescue Net::SSH::AuthenticationFailed, Errno::ECONNREFUSED => e
