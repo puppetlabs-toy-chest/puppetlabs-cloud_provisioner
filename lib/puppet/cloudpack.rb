@@ -598,6 +598,15 @@ module Puppet::CloudPack
           Puppet.info "Failed to connect with issue #{e} (Retry #{retries})"
           Puppet.info "This may be because the machine is booting.  Retrying the connection..."
         end
+      rescue Errno::ECONNRESET => e
+        if (retries += 1) > 10
+          Puppet.err "Connection reset.  The error is: #{e}"
+          raise Puppet::Error, "Max number of retries for ssh connetion exceeded"
+        else
+          Puppet.err "Connection reset with message: #{e} (Retry #{retries})"
+          Puppet.err "Retrying..."
+          sleep 5
+        end
       rescue Timeout::Error => e
         if (retries += 1) > 5
           Puppet.err "Could not connect via SSH.  The error is: #{e}"
