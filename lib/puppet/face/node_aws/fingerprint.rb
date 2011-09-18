@@ -1,4 +1,5 @@
 require 'puppet/cloudpack'
+require 'puppet/face/node_aws'
 
 Puppet::Face.define :node_aws, '0.0.1' do
   action :fingerprint do
