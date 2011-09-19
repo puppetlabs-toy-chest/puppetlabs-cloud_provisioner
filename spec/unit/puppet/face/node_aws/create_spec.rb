@@ -13,7 +13,7 @@ describe Puppet::Face[:node_aws, :current] do
       :platform => 'AWS',
       :image    => 'ami-12345',
       :type     => 'm1.small',
-      :keypair  => 'some_keypair',
+      :keyname  => 'some_keypair',
       :region   => 'us-east-1',
     }
   end
@@ -66,16 +66,16 @@ describe Puppet::Face[:node_aws, :current] do
       end
     end
 
-    describe '(keypair)' do
-      it 'should require a keypair name' do
-        @options.delete(:keypair)
+    describe '(keyname)' do
+      it 'should require a keyname' do
+        @options.delete(:keyname)
         expect { subject.create(@options) }.to raise_error ArgumentError, /required/
       end
 
       it 'should validate the image name' do
-        @options[:keypair] = 'RejectedKeypairName'
+        @options[:keyname] = 'RejectedKeypairName'
         expect { subject.create(@options) }.to raise_error ArgumentError,
-          /unrecognized.*: #{@options[:keypair]}/i
+          /unrecognized.*: #{@options[:keyname]}/i
       end
     end
 
