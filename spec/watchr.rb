@@ -1,127 +1,85 @@
-ENV["WATCHR"] = "1"
+ENV['FOG_MOCK'] ||= 'true'
 ENV['AUTOTEST'] = 'true'
+ENV['WATCHR']   = '1'
 
-def run_comp(cmd)
-  puts cmd
-  results = []
-  old_sync = $stdout.sync
-  $stdout.sync = true
-  line = []
-  begin
-    open("| #{cmd}", "r") do |f|
-      until f.eof? do
-        c = f.getc
-        putc c
-        line << c
-        if c == ?\n
-          results << if RUBY_VERSION >= "1.9" then
-              line.join
-            else
-              line.pack "c*"
-            end
-          line.clear
-        end
-      end
-    end
-  ensure
-    $stdout.sync = old_sync
-  end
-  results.join
-end
+system 'clear'
 
-def clear
-  #system("clear")
-end
-
-def growl(message, status)
-  # Strip the color codes
-  message.gsub!(/\[\d+m/, '')
-
+def growl(message)
   growlnotify = `which growlnotify`.chomp
-  return if growlnotify.empty?
   title = "Watchr Test Results"
-  image = status == :pass ? "autotest/images/pass.png" : "autotest/images/fail.png"
+  image = case message
+  when /(\d+)\s+?(failure|error)/i
+    ($1.to_i == 0) ? "~/.watchr_images/passed.png" : "~/.watchr_images/failed.png"
+  else
+    '~/.watchr_images/unknown.png'
+  end
   options = "-w -n Watchr --image '#{File.expand_path(image)}' -m '#{message}' '#{title}'"
   system %(#{growlnotify} #{options} &)
 end
 
-def file2specs(file)
-  %w{spec/unit spec/integration}.collect { |d|
-    file.sub('lib/puppet', d).sub('.rb', '_spec.rb')
-  }.find_all { |f|
-    FileTest.exist?(f)
-  }
+def run(cmd)
+  puts(cmd)
+  `#{cmd}`
 end
 
-def run_spec(command)
-  clear
-  result = run_comp(command).split("\n").last
-  status = result.include?('0 failures') ? :pass : :fail
-  growl result, status
-end
-
-def run_spec_files(files)
-  files = Array(files)
-  return if files.empty?
-  begin
-    system("rspec #{spec_opts} #{files.join(' ')}")
-  rescue => detail
-    puts detail.backtrace
-    warn "Failed to run #{files.join(', ')}: #{detail}"
+def run_spec_test(file)
+  if File.exist? file
+    result = run "rspec --format p --color #{file}"
+    growl result.split("\n").last
+    puts result
+  else
+    puts "FIXME: No test #{file} [#{Time.now}]"
   end
 end
 
-def run_suite
-  files = files("unit") + files("integration")
-  system("rspec #{spec_opts} #{files.join(' ')}")
+def filter_rspec(data)
+  data.split("\n").find_all do |l|
+    l =~ /^(\d+)\s+exampl\w+.*?(\d+).*?failur\w+.*?(\d+).*?pending/
+  end.join("\n")
 end
 
-def spec_opts
-  @opts ||= File.readlines('spec/spec.opts').collect { |l| l.chomp }.join(" ")
+def run_all_tests
+  system('clear')
+  files = Dir.glob("spec/**/*_spec.rb").join(" ")
+  result = run "rspec #{files}"
+  growl_results = filter_rspec result
+  growl growl_results
+  puts result
+  puts "GROWL: #{growl_results}"
 end
-
-def files(dir)
-  require 'find'
-
-  result = []
-  Find.find(File.join("spec", dir)) do |path|
-    result << path if path =~ /\.rb/
-  end
-  
-  result
-end
-
-watch('spec/spec_helper.rb') { run_suite }
-watch(%r{^spec/(unit|integration)/.*\.rb$}) { |md| run_spec_files(md[0]) }
-watch(%r{^lib/puppet/(.*)\.rb$}) { |md|
-  run_spec_files(file2specs(md[0]))
-}
-watch(%r{^spec/lib/spec.*}) { |md| run_suite }
-watch(%r{^spec/lib/monkey_patches/.*}) { |md| run_suite }
 
 # Ctrl-\
 Signal.trap 'QUIT' do
   puts " --- Running all tests ---\n\n"
-  run_suite
+  run_all_tests
 end
 
 @interrupted = false
 
 # Ctrl-C
 Signal.trap 'INT' do
-  if @interrupted
+  if @interrupted then
     @wants_to_quit = true
     abort("\n")
   else
-    puts "Interrupt a second time to quit; wait for rerun of tests"
+    puts "Interrupt a second time to quit"
     @interrupted = true
     Kernel.sleep 1.5
     # raise Interrupt, nil # let the run loop catch it
-    begin
-      run_suite
-    rescue => detail
-      puts detail.backtrace
-      puts "Could not run suite: #{detail}"
-    end
+    run_suite
   end
+end
+
+def file2spec(file)
+  result = file.sub('lib/puppet/', 'spec/unit/').gsub(/\.rb$/, '_spec.rb')
+end
+
+
+watch( 'spec/.*_spec\.rb' ) do |md|
+  #run_spec_test(md[0])
+  run_all_tests
+end
+watch( 'lib/.*\.rb' ) do |md|
+  # run_spec_test(file2spec(md[0]))
+  run_all_tests
 end
