@@ -10,6 +10,7 @@ describe Puppet::Face[:node, :current] do
       :installer_payload => Tempfile.new('some.tar.gz').path,
       :installer_answers => Tempfile.new('some.answers').path
     }
+    ENV['SSH_AUTH_SOCK'] = '/tmp/foo.socket'
   end
 
   after :each do
@@ -48,7 +49,6 @@ describe Puppet::Face[:node, :current] do
     end
 
     describe '(installer-payload)' do
-
       it 'should validate the installer payload for existence' do
         opts = @options.update :installer_payload => '/dev/null/nonexistent.file'
         expect { subject.install('server', opts) }.to raise_error ArgumentError, /could not find/i
@@ -68,7 +68,6 @@ describe Puppet::Face[:node, :current] do
     end
 
     describe '(installer-answers)' do
-
       it 'should validate the answers file for existence' do
         opts = @options.update :installer_answers => '/dev/null/nonexistent.file'
         expect { subject.install('server', opts) }.to raise_error ArgumentError, /could not find/i
@@ -87,8 +86,8 @@ describe Puppet::Face[:node, :current] do
         opts[:installer_script] = "puppet-enterprise-s3"
         expect { subject.install('server', opts) }.to raise_error ArgumentError, /answers/i
       end
-
     end
+
     describe '(puppet-version)' do
       ['2.7.x', 'master', '2.6.9'].each do |version|
         it "should accept valid value #{version}" do
@@ -102,6 +101,29 @@ describe Puppet::Face[:node, :current] do
         opts = @options.update :puppet_version => '1.2.3.4'
         expect { subject.install('server', opts) }.to raise_error(ArgumentError, /Invaid Puppet version/)
       end
+    end
+  end
+
+  describe 'valid options' do
+    let(:user_options) do { :login => 'ubuntu', :keyfile => 'agent' }; end
+
+    it 'should support using keys from an agent' do
+      Puppet::CloudPack.expects(:install).once.with() do |server, received_options|
+        received_options[:keyfile] == user_options[:keyfile]
+      end
+      subject.install('server', user_options)
+    end
+
+    it 'should not pass the string agent to Net::SSH' do
+      Net::SSH.expects(:start).times(3).with() do |server, login, options|
+        not options.has_key? :keys
+      end
+      subject.install('server', user_options)
+    end
+
+    it 'should raise an error if SSH_AUTH_SOCK is not set' do
+      ENV['SSH_AUTH_SOCK'] = nil
+      expect { subject.install('server', user_options) }.to raise_error ArgumentError, /SSH_AUTH_SOCK/
     end
   end
 end

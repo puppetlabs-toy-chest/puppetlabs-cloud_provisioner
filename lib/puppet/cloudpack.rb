@@ -196,7 +196,7 @@ module Puppet::CloudPack
       end
 
       action.option '--keyfile=' do
-        summary "The path to the local SSH private key"
+        summary "The path to the local SSH private key or 'agent' if the private key is loaded in an agent"
         description <<-EOT
           This option expects the filesystem path to the local private key that
           can be used to ssh into the instance. If the instance was created with the
@@ -208,7 +208,12 @@ module Puppet::CloudPack
         EOT
         required
         before_action do |action, arguments, options|
-          break if options[:keyfile] =~ /^agent$/i
+          # If the user specified --keyfile=agent, check for SSH_AUTH_SOCK
+          if options[:keyfile] =~ /^agent$/i
+            raise ArgumentError, "SSH_AUTH_SOCK environment variable is not set and you specified --agent keyfile.  Please check that ssh-agent is running correctly, or perhaps SSH agent forwarding is disabled." unless ENV['SSH_AUTH_SOCK']
+            break
+          end
+
           keyfile = File.expand_path(options[:keyfile])
           unless test 'f', keyfile
             raise ArgumentError, "Could not find file '#{keyfile}'"
@@ -528,8 +533,12 @@ module Puppet::CloudPack
     end
 
     def install(server, options)
-
       options = merge_default_options(options)
+
+      # If the end user wants to use their agent, we need to set keyfile to nil
+      if options[:keyfile] == 'agent' then
+        options[:keyfile] = nil
+      end
 
       options[:certname] ||= Guid.new.to_s
       options[:public_dns_name] = server
@@ -567,7 +576,11 @@ module Puppet::CloudPack
       Puppet.debug "Command: #{command}"
       buffer = String.new
       exit_code = nil
-      Net::SSH.start(server, login, :keys => [ keyfile ]) do |session|
+      # Figure out the options we need to pass to start.  This allows us to use SSH_AUTH_SOCK
+      # if the end user specifies --keyfile=agent
+      ssh_opts = keyfile ? { :keys => [ keyfile ] } : { }
+      # Start
+      Net::SSH.start(server, login, ssh_opts) do |session|
         session.open_channel do |channel|
           channel.on_data do |ch, data|
             buffer << data
@@ -654,6 +667,7 @@ module Puppet::CloudPack
 
     def ssh_connect(server, login, keyfile = nil)
       opts = {}
+      # This allows SSH_AUTH_SOCK agent usage if keyfile is nil
       opts[:key_data] = [File.read(File.expand_path(keyfile))] if keyfile
 
       ssh_test_connect(server, login, keyfile)
