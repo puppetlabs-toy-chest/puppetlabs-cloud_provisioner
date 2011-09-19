@@ -6,7 +6,7 @@ describe Puppet::Face[:node_aws, :current] do
     @options = {
       :platform          => 'AWS',
       :image             => 'ami-12345',
-      :keypair           => 'some_keypair',
+      :keyname           => 'some_keypair',
       :login             => 'ubuntu',
       :keyfile           => 'file_on_disk.txt',
       :installer_payload => 'some.tar.gz',
@@ -48,7 +48,7 @@ describe Puppet::Face[:node_aws, :current] do
 
     describe '(keypair)' do
       it 'should require a keypair name' do
-        @options.delete(:keypair)
+        @options.delete(:keyname)
         expect { subject.bootstrap(@options) }.to raise_error ArgumentError, /required/
       end
     end

@@ -115,20 +115,23 @@ module Puppet::CloudPack
         end
       end
 
-      action.option '--keypair=' do
-        summary 'SSH keypair used to access the instance.'
+      action.option '--keyname=' do
+        summary 'The AWS SSH key name as shown in the AWS console.  Please see the related list_keynames action.'
         description <<-EOT
-          The key pair that will be used to ssh into your machine instance
-          once it has been created. This expects the id of the ssh keypair as
-          represented in the aws console.
+          This options expects the name of the SSH key pair as listed in the
+          Amazon AWS console.  Cloud Provisioner will use this information to tell Amazon
+          to install the public SSH key into the authorized_keys file of the new EC2
+          instance.  This is a related, but distinct, option from the --keyfile option of
+          the install action.  To obtain a listing of valid keynames please see the
+          list_keynames action.
         EOT
         required
         before_action do |action, args, options|
           # We add this option because it's required in Fog but optional for Cloud Pack
           # It doesn't feel right to do this here, but I don't know another way yet.
           options = Puppet::CloudPack.merge_default_options(options)
-          if Puppet::CloudPack.create_connection(options).key_pairs.get(options[:keypair]).nil?
-            raise ArgumentError, "Unrecognized keypair name: #{options[:keypair]}"
+          if Puppet::CloudPack.create_connection(options).key_pairs.get(options[:keyname]).nil?
+            raise ArgumentError, "Unrecognized key name: #{options[:keyname]} (Suggestion: use the puppet node_aws list_keynames action to find a list of valid key names for your account.)"
           end
         end
       end
@@ -148,6 +151,11 @@ module Puppet::CloudPack
     end
 
     def add_list_options(action)
+      add_platform_option(action)
+      add_region_option(action)
+    end
+
+    def add_list_keynames_options(action)
       add_platform_option(action)
       add_region_option(action)
     end
@@ -181,22 +189,26 @@ module Puppet::CloudPack
         description <<-EOT
           The name of the user to login to the instance as.
           This should be the same user who has been configured
-          with your keypair for passwordless access.
+          with your key pair for passwordless access.
           This is usually the root user.
         EOT
         required
       end
 
       action.option '--keyfile=' do
-        summary "SSH private key used to determine user's identify."
+        summary "The path to the local SSH private key"
         description <<-EOT
-          Path to the local private key that can be used to ssh into
-          the instance. If the instance was created with
-          the create action, this should be the private key
-          part of the keypair.
+          This option expects the filesystem path to the local private key that
+          can be used to ssh into the instance. If the instance was created with the
+          create action, this should be the path to the private key file downloaded
+          from the Amazon AWS EC2.
+
+          Specify 'agent' if you have the key loaded in your agent and available via
+          the SSH_AUTH_SOCK variable.
         EOT
         required
         before_action do |action, arguments, options|
+          break if options[:keyfile] =~ /^agent$/i
           keyfile = File.expand_path(options[:keyfile])
           unless test 'f', keyfile
             raise ArgumentError, "Could not find file '#{keyfile}'"
@@ -409,6 +421,22 @@ module Puppet::CloudPack
       end
 
       return server.dns_name
+    end
+
+    def list_keynames(options = {})
+      options = merge_default_options(options)
+      connection = create_connection(options)
+      keys_array = connection.key_pairs.collect do |key|
+        key.attributes.inject({}) { |memo,(k,v)| memo[k.to_s] = v; memo }
+      end
+      # Covert the array into a Hash
+      keys_hash = Hash.new
+      keys_array.each { |key| keys_hash.merge!({key['name'] => key['fingerprint']}) }
+      # Get a sorted list of the names
+      sorted_names = keys_hash.keys.sort
+      sorted_names.collect do |name|
+        { 'name' => name, 'fingerprint' => keys_hash[name] }
+      end
     end
 
     def list(options)

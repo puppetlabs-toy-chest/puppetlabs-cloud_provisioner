@@ -11,5 +11,4 @@ Puppet::Face.define(:node_aws, '0.0.1') do
     machines, install Puppet onto them, and tear them down when they're no longer
     required.
   EOT
-
 end
