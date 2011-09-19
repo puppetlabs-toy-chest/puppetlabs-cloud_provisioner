@@ -7,7 +7,7 @@ Puppet::Face.define :node, '0.0.1' do
       Make Puppet Dashboard aware of a newly created agent
       node and add it to a node group, thus allowing it to
       receive proper configurations on its next run. This
-      action will have no material effect unless you’re using
+      action will have no material effect unless you're using
       Puppet dashboard for node classification.
 
       This action is not restricted to cloud machine instances.
