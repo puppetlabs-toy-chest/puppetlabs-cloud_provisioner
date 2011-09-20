@@ -53,6 +53,17 @@ describe Puppet::Face[:node, :current] do
         opts = @options.update :installer_payload => '/dev/null/nonexistent.file'
         expect { subject.install('server', opts) }.to raise_error ArgumentError, /could not find/i
       end
+      ['http://foo:8080', 'https://bar', 'ftp://baz'].each do |url|
+        it "should not validate the installer payload for file existance when it is a url: #{url}" do
+          Puppet::CloudPack.expects(:install)
+          opts = @options.update :installer_payload => url
+          subject.install('server', opts)
+        end
+      end
+      it 'should detect invalid urls' do
+        opts = @options.update :installer_payload => 'invalid path'
+        expect { subject.install('server', opts) }.to raise_error ArgumentError, /Invalid input/
+      end
 
       it 'should validate the installer payload for readability' do
         File.chmod 0300, @options[:installer_payload]

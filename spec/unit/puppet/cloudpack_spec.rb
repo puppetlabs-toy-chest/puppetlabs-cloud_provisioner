@@ -324,6 +324,15 @@ describe Puppet::CloudPack do
           {:installer_payload => 'foo', :tmp_dir => '/tmp'}
         )
       end
+      ['http://foo:80', 'ftp://foo', 'https://blah'].each do |url|
+        it 'should not upload the installer_payload when it is an http URL' do
+          @scp_mock.expects(:upload).never
+          @result = subject.upload_payloads(
+            @scp_mock,
+            {:installer_payload => url, :tmp_dir => '/tmp'}
+          )
+        end
+      end
       it 'should require installer payload when install-script is puppet-enterprise' do
         expect do
           subject.upload_payloads(

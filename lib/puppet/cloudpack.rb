@@ -235,7 +235,7 @@ module Puppet::CloudPack
       end
 
       action.option '--installer-payload=' do
-        summary 'The location of the Pupept Enterprise universal gzipped tarball'
+        summary 'The location of the Puppet Enterprise universal gzipped tarball'
         description <<-EOT
           Location of the Puppet enterprise universal tarball to be used
           for the installation. This option is only required if Puppet
@@ -243,12 +243,18 @@ module Puppet::CloudPack
           This tarball must be zipped.
         EOT
         before_action do |action, arguments, options|
-          options[:installer_payload] = File.expand_path(options[:installer_payload])
-          unless test 'f', options[:installer_payload]
-            raise ArgumentError, "Could not find file '#{options[:installer_payload]}'"
-          end
-          unless test 'r', options[:installer_payload]
-            raise ArgumentError, "Could not read from file '#{options[:installer_payload]}'"
+          type = Puppet::CloudPack.payload_type(options[:installer_payload])
+          case type
+          when :invalid
+            raise ArgumentError, "Invalid input '#{options[:installer_payload]}' for option installer-payload, should be a URL or a file path"
+          when :file_path
+            options[:installer_payload] = File.expand_path(options[:installer_payload])
+            unless test 'f', options[:installer_payload]
+              raise ArgumentError, "Could not find file '#{options[:installer_payload]}'"
+            end
+            unless test 'r', options[:installer_payload]
+              raise ArgumentError, "Could not read from file '#{options[:installer_payload]}'"
+            end
           end
           unless(options[:installer_payload] =~ /(tgz|gz)$/)
             Puppet.warning("Option: intaller-payload expects a .tgz or .gz file")
@@ -704,7 +710,7 @@ module Puppet::CloudPack
         end
       end
 
-      if options[:installer_payload]
+      if options[:installer_payload] and payload_type(options[:installer_payload]) == :file_path
         Puppet.notice "Uploading Puppet Enterprise tarball ..."
         scp.upload(options[:installer_payload], "#{options[:tmp_dir]}/puppet.tar.gz")
         Puppet.notice "Uploading Puppet Enterprise tarball ... Done"
@@ -793,6 +799,20 @@ module Puppet::CloudPack
         :resource_id => server.id
       )
       Puppet.notice('Creating tags for instance ... Done')
+    end
+
+    def payload_type(payload)
+      uri = begin
+        URI.parse(payload)
+      rescue URI::InvalidURIError => e
+        return :invalid
+      end
+      if uri.class.to_s =~ /URI::(FTP|HTTPS?)/
+        $1.downcase.to_sym
+      else
+        # assuming that everything else is a valid filepath
+        :file_path
+      end
     end
   end
 end
