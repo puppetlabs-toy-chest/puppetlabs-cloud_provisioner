@@ -209,8 +209,17 @@ module Puppet::CloudPack
         required
         before_action do |action, arguments, options|
           # If the user specified --keyfile=agent, check for SSH_AUTH_SOCK
-          if options[:keyfile] =~ /^agent$/i
-            raise ArgumentError, "SSH_AUTH_SOCK environment variable is not set and you specified --agent keyfile.  Please check that ssh-agent is running correctly, or perhaps SSH agent forwarding is disabled." unless ENV['SSH_AUTH_SOCK']
+          if options[:keyfile].downcase == 'agent' then
+            # Force the option value to lower case to make it easier to test
+            # for 'agent' in all other sections of the code.
+            options[:keyfile].downcase!
+            # Check if the user actually has access to an Agent.
+            if ! ENV['SSH_AUTH_SOCK'] then
+              raise ArgumentError,
+                "SSH_AUTH_SOCK environment variable is not set and you specified --agent keyfile.  Please check that ssh-agent is running correctly, or perhaps SSH agent forwarding is disabled."
+            end
+            # We break out of the before action block because we don't really
+            # have anything else to do to support ssh agent authentication.
             break
           end
 
