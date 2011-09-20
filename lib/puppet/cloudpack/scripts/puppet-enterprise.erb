@@ -1,7 +1,10 @@
+#!/bin/bash
 # this assumes that the payload has already been delivered
 cd <%= options[:tmp_dir] %>
 # copied by the install action of cloudpack
-tar -xvzf puppet.tar.gz
+install_dir=puppet-enterprise
+mkdir "${install_dir}"
+tar -xvzf puppet.tar.gz --strip-components 1 -C "${install_dir}"
 grep -q '^q_puppetagent_certname' puppet.answers && (echo 'PE answers file already contains line q_puppetagent_certname';exit 1)
 echo "q_puppetagent_certname='<%= options[:certname] %>'" >> puppet.answers
-puppet-enterprise-<%= options[:pe_version] ? options[:pe_version] : '1.1' %>-all/puppet-enterprise-installer -a puppet.answers >& install.log
+"${install_dir}/puppet-enterprise-installer" -a puppet.answers >& install.log
