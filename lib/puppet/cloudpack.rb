@@ -569,7 +569,6 @@ module Puppet::CloudPack
         options[:keyfile] = nil
       end
 
-      options[:certname] ||= Guid.new.to_s
       # FIXME: This appears to be an AWS assumption.  What about VMware with a plain IP?
       # (Not necessarily a bug, just a yak to shave...)
       options[:public_dns_name] = server
@@ -593,8 +592,8 @@ module Puppet::CloudPack
       install_command = "bash -c 'chmod u+x #{remote_script_path}; #{remote_script_path}'"
       install_command = options[:login] == 'root' ? install_command : 'sudo ' + install_command
       ssh_remote_execute(server, options[:login], install_command, options[:keyfile])
-
-      options[:certname]
+      # Return value
+      { 'status' => "success" }
     end
 
     # This is the single place to make SSH calls.  It will handle collecting STDOUT

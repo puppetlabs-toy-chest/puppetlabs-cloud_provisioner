@@ -30,7 +30,7 @@ cat >/etc/puppet/puppet.conf <<'EOFPUPPETCONF'
   pluginsync = true
   server = <%= options[:server] %>
   environment = <%= options[:environment] %>
-  certname = <%= options[:certname] %>
+  certname = <%= options[:puppetagent_certname] %>
   report = true
 EOFPUPPETCONF
 

@@ -205,12 +205,8 @@ describe Puppet::CloudPack do
         Puppet::CloudPack.expects(:ssh_connect).with(@server, @login, @keyfile.path).returns(@mock_connection_tuple)
         Puppet::CloudPack.expects(:ssh_remote_execute).twice.with(any_parameters)
       end
-      it 'should return a generated certname matching a guid' do
-        subject.install(@server, @options).should match(/[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}/)
-      end
       it 'should return the specified certname' do
-        @options[:certname] = 'abc123'
-        subject.install(@server, @options).should eq 'abc123'
+        subject.install(@server, @options)['status'].should == 'success'
       end
       it 'should set server as public_dns_name option' do
         subject.expects(:compile_template).with do |options|
