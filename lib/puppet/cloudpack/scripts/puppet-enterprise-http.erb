@@ -1,16 +1,13 @@
-#!/bin/bash
+#! /bin/bash
+set -x
 set -e
 set -u
-set -x
 
 # The installer action determines a temporary directory internally
 # This is not a user defined option.  You may assume this will be
 # a unique string of characters.
-cd '<%= options[:tmp_dir] %>'
-install_dir=puppet-enterprise
-mkdir "${install_dir}"
-
-tar -xvzf puppet.tar.gz --strip-components 1 -C "${install_dir}"
+tmpdir='<%= options[:tmp_dir] %>'
+cd "${tmpdir}"
 
 # This is an option provided by the face install action.
 # If it is not provided, this environment variable will be
@@ -21,6 +18,7 @@ PUPPETAGENT_CERTNAME='<%= options[:puppetagent_certname] %>'
 # --puppetagent-certname=foobar then the environment variable above will be
 # nonzero length.  We should replace it in the answers file.
 # (Note, the answers file has been uploaded by the face action)
+# Finally, actually install Puppet Enterprise
 if [[ -n "${PUPPETAGENT_CERTNAME}" ]]; then
   # Let's play shuffle the files.
   mv puppet.answers puppet.answers.orig
@@ -29,6 +27,23 @@ if [[ -n "${PUPPETAGENT_CERTNAME}" ]]; then
   # Append the user specified option from the command line arguments.
   echo 'q_puppetagent_certname=<%= options[:puppetagent_certname] %>' >> puppet.answers
 fi
+
+echo "Installation script has started..."
+echo "Downloading from: <%= options[:installer_payload] %>"
+
+# Create a new directory to decompress the Puppet Enterprise installer
+# into.  This provides us with consistent pathing regardless of the PE
+# version.
+install_dir="puppet-enterprise"
+mkdir "${install_dir}"
+
+# We assume the payload is a tar.gz file because the option handler
+# enforces this.
+# To save disk space (I'm concerned about /tmp filling) decompress on the fly.
+echo "Uncompressing the payload ..."
+curl -o - '<%= options[:installer_payload] %>' | tar -xvzf - --strip-components 1 -C "${install_dir}"
+# REVISIT (This assumes GNU tar with the --strip-components option)
+echo "Uncompressing the payload ... Done."
 
 # Finally, actually install Puppet Enterprise
 "${install_dir}"/puppet-enterprise-installer -a puppet.answers 2>&1 | tee install.log

@@ -279,6 +279,19 @@ module Puppet::CloudPack
         end
       end
 
+      action.option '--puppetagent-certname=' do
+        summary 'The Puppet Agent certificate name to configure on the target system'
+        description <<-EOT
+          This option allows you to specify an optional Puppet Agent
+          certificate name to configure on the target system.  This option
+          applies to the puppet-enterprise and puppet-enterprise-http
+          installation scripts.  If provided, this option will replace any
+          puppet agent certificate name provided in the puppet enterprise
+          answers file.  This certificate name will show up in the Puppet Dashboard
+          when the agent checks in for the first time.
+        EOT
+      end
+
       action.option '--install-script=' do
         summary 'Name of the template to use for installation'
         description <<-EOT
@@ -557,6 +570,8 @@ module Puppet::CloudPack
       end
 
       options[:certname] ||= Guid.new.to_s
+      # FIXME: This appears to be an AWS assumption.  What about VMware with a plain IP?
+      # (Not necessarily a bug, just a yak to shave...)
       options[:public_dns_name] = server
 
       # FIXME We shouldn't try to connect if the answers file hasn't been provided

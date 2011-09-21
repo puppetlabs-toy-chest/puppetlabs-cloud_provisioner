@@ -116,25 +116,38 @@ describe Puppet::Face[:node, :current] do
   end
 
   describe 'valid options' do
-    let(:user_options) do { :login => 'ubuntu', :keyfile => 'agent' }; end
+    describe 'keyfile option' do
+      let(:user_options) do { :login => 'ubuntu', :keyfile => 'agent' }; end
 
-    it 'should support using keys from an agent' do
-      Puppet::CloudPack.expects(:install).once.with() do |server, received_options|
-        received_options[:keyfile] == user_options[:keyfile]
+      it 'should support using keys from an agent' do
+        Puppet::CloudPack.expects(:install).once.with() do |server, received_options|
+          received_options[:keyfile] == user_options[:keyfile]
+        end
+        subject.install('server', user_options)
       end
-      subject.install('server', user_options)
+
+      it 'should not pass the string agent to Net::SSH' do
+        Net::SSH.expects(:start).times(3).with() do |server, login, options|
+          not options.has_key? :keys
+        end
+        subject.install('server', user_options)
+      end
+
+      it 'should raise an error if SSH_AUTH_SOCK is not set' do
+        ENV['SSH_AUTH_SOCK'] = nil
+        expect { subject.install('server', user_options) }.to raise_error ArgumentError, /SSH_AUTH_SOCK/
+      end
     end
 
-    it 'should not pass the string agent to Net::SSH' do
-      Net::SSH.expects(:start).times(3).with() do |server, login, options|
-        not options.has_key? :keys
-      end
-      subject.install('server', user_options)
-    end
+    describe 'puppetagent-certname option' do
+      let(:user_options) do { :login => 'ubuntu', :keyfile => 'agent', :puppetagent_certname => 'jeffmaster' }; end
 
-    it 'should raise an error if SSH_AUTH_SOCK is not set' do
-      ENV['SSH_AUTH_SOCK'] = nil
-      expect { subject.install('server', user_options) }.to raise_error ArgumentError, /SSH_AUTH_SOCK/
+      it 'should support setting the agent certificate name' do
+        Puppet::CloudPack.expects(:install).once.with() do |server, received_options|
+          received_options[:puppetagent_certname] == user_options[:puppetagent_certname]
+        end
+        subject.install('server', user_options)
+      end
     end
   end
 end

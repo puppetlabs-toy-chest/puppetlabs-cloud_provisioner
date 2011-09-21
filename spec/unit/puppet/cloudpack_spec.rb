@@ -199,7 +199,7 @@ describe Puppet::CloudPack do
           :keyfile           => @keyfile.path,
           :login             => @login,
           :server            => @server,
-          :install_script    => "puppet-enterprise-s3",
+          :install_script    => "puppet-enterprise-http",
           :installer_answers => "/Users/jeff/vms/moduledev/enterprise/answers_cloudpack.txt",
         }
         Puppet::CloudPack.expects(:ssh_connect).with(@server, @login, @keyfile.path).returns(@mock_connection_tuple)
