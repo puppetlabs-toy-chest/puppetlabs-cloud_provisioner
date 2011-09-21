@@ -199,7 +199,7 @@ describe Puppet::CloudPack do
           :keyfile           => @keyfile.path,
           :login             => @login,
           :server            => @server,
-          :install_script    => "puppet-enterprise-s3",
+          :install_script    => "puppet-enterprise-http",
           :installer_answers => "/Users/jeff/vms/moduledev/enterprise/answers_cloudpack.txt",
         }
         Puppet::CloudPack.expects(:ssh_connect).with(@server, @login, @keyfile.path).returns(@mock_connection_tuple)
@@ -323,6 +323,15 @@ describe Puppet::CloudPack do
           @scp_mock,
           {:installer_payload => 'foo', :tmp_dir => '/tmp'}
         )
+      end
+      ['http://foo:80', 'ftp://foo', 'https://blah'].each do |url|
+        it 'should not upload the installer_payload when it is an http URL' do
+          @scp_mock.expects(:upload).never
+          @result = subject.upload_payloads(
+            @scp_mock,
+            {:installer_payload => url, :tmp_dir => '/tmp'}
+          )
+        end
       end
       it 'should require installer payload when install-script is puppet-enterprise' do
         expect do
