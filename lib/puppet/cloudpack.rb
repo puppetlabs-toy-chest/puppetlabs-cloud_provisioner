@@ -395,7 +395,7 @@ module Puppet::CloudPack
       # TODO: Can this throw errors?
       server     = create_server(connection.servers,
         :image_id   => options[:image],
-        :key_name   => options[:keypair],
+        :key_name   => options[:keyname],
         :groups     => options[:group],
         :flavor_id  => options[:type]
       )
