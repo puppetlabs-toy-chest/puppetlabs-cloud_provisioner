@@ -378,13 +378,15 @@ module Puppet::CloudPack
         node_group_id = node_group_info['id']
 
         Puppet.notice 'Classifying node ...'
-        data = { 'node_name' => certname, 'group_name' => options[:node_group] }
-        response = http.post("/memberships.json", data.to_pson, headers)
-        if (response.code == '201')
-          Puppet.notice 'Classifying node ... Done'
+        response = http.get("/memberships.json", headers)
+        memberships = handle_json_response(response, 'List memberships')
+        if memberships.detect{ |members| members['node_group_id'] == node_group_id and members['node_id'] == node_id }
+          Puppet.warning("Group #{options[:node_group]} already added to node #{options[:node_name]}, nothing to do")
         else
-          Puppet.warning 'Classifying node ... Failed'
-          Puppet.warning "Server responded with a #{response.code} status"
+          # add the node group to the node if the relationship did not already exist
+          data = { 'node_name' => certname, 'group_name' => options[:node_group] }
+          response = http.post("/memberships.json", data.to_pson, headers)
+          handle_json_response(response, 'Classify node', '201')
         end
       rescue Errno::ECONNREFUSED
         Puppet.warning 'Registering node ... Error'
