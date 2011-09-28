@@ -9,6 +9,9 @@ Puppet::Face.define :node, '0.0.1' do
       run the installation commmands remotely.
     EOT
     Puppet::CloudPack.add_install_options(self)
+    when_rendering :console do |return_value|
+      return_value.keys.sort.collect { |k| "%20.20s: %-20s" % [k, return_value[k]] }.join("\n")
+    end
     when_invoked do |server, options|
       Puppet::CloudPack.install(server, options)
     end

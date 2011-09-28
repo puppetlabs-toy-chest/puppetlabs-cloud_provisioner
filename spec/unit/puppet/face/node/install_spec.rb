@@ -115,9 +115,36 @@ describe Puppet::Face[:node, :current] do
     end
   end
 
+  describe 'when installing as root and non-root' do
+    let(:ssh_remote_execute_results) do { :exit_code => 0, :stdout => 'stdout' }; end
+    let(:root_options) do { :login => 'root', :keyfile => 'agent' }; end
+    let(:user_options) do { :login => 'ubuntu', :keyfile => 'agent' }; end
+    it 'should use sudo when not root' do
+      # We (may) need a state machine here
+      installation = states('installation').starts_as('unstarted')
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('unstarted')).then(installation.is('date_checked'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('date_checked')).then(installation.is('installed'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('installed')).then(installation.is('finished'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).with("server", user_options[:login], 'sudo puppet agent --configprint certname').when(installation.is('finished'))
+
+      subject.install('server', user_options)
+    end
+    it 'should not use sudo when root' do
+      # We (may) need a state machine here
+      installation = states('installation').starts_as('unstarted')
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('unstarted')).then(installation.is('date_checked'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('date_checked')).then(installation.is('installed'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('installed')).then(installation.is('finished'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).with("server", root_options[:login], 'puppet agent --configprint certname').when(installation.is('finished'))
+
+      subject.install('server', root_options)
+    end
+  end
+
   describe 'valid options' do
     describe 'keyfile option' do
       let(:user_options) do { :login => 'ubuntu', :keyfile => 'agent' }; end
+      let(:ssh_remote_execute_results) do { :exit_code => 0, :stdout => 'stdout' }; end
 
       it 'should support using keys from an agent' do
         Puppet::CloudPack.expects(:install).once.with() do |server, received_options|
@@ -126,10 +153,10 @@ describe Puppet::Face[:node, :current] do
         subject.install('server', user_options)
       end
 
-      it 'should not pass the string agent to Net::SSH' do
-        Net::SSH.expects(:start).times(3).with() do |server, login, options|
-          not options.has_key? :keys
-        end
+      it 'should not pass the string agent to ssh' do
+        Puppet::CloudPack.expects(:ssh_remote_execute).times(4).with() do |server, login, command, keyfile|
+          keyfile.should be_nil
+        end.returns(ssh_remote_execute_results)
         subject.install('server', user_options)
       end
 

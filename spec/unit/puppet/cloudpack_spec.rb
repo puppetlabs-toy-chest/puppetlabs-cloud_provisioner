@@ -177,6 +177,8 @@ describe Puppet::CloudPack do
   end
 
   describe 'install helper methods' do
+    let(:ssh_remote_execute_return_hash) { { :stdout => 'fakestdout', :exit_code => 0 } }
+
     before :all do
       @server = 'ec2-50-19-20-121.compute-1.amazonaws.com'
       @login  = 'root'
@@ -203,7 +205,7 @@ describe Puppet::CloudPack do
           :installer_answers => "/Users/jeff/vms/moduledev/enterprise/answers_cloudpack.txt",
         }
         Puppet::CloudPack.expects(:ssh_connect).with(@server, @login, @keyfile.path).returns(@mock_connection_tuple)
-        Puppet::CloudPack.expects(:ssh_remote_execute).twice.with(any_parameters)
+        Puppet::CloudPack.expects(:ssh_remote_execute).times(3).with(any_parameters).returns ssh_remote_execute_return_hash
       end
       it 'should return the specified certname' do
         subject.install(@server, @options)['status'].should == 'success'
@@ -226,7 +228,7 @@ describe Puppet::CloudPack do
         @options[:login] = 'dan'
         Puppet::CloudPack.expects(:ssh_connect).with(@server, 'dan', @keyfile.path).returns(@mock_connection_tuple)
         @is_command_valid = false
-        Puppet::CloudPack.expects(:ssh_remote_execute).twice.with do |server, login, command, keyfile|
+        Puppet::CloudPack.expects(:ssh_remote_execute).times(3).with do |server, login, command, keyfile|
           if command =~ /^sudo bash -c 'chmod u\+x \S+gems\.sh; \S+gems\.sh'/
             # set that the command is valid when it matches the regex
             # the test will pass is this is set to true
@@ -234,7 +236,7 @@ describe Puppet::CloudPack do
           else
             true
           end
-        end
+        end.returns(ssh_remote_execute_return_hash)
         subject.install(@server, @options)
         @is_command_valid.should be_true
       end
@@ -242,7 +244,7 @@ describe Puppet::CloudPack do
         @options[:login] = 'root'
         Puppet::CloudPack.expects(:ssh_connect).with(@server, 'root', @keyfile.path).returns(@mock_connection_tuple)
         @is_command_valid = false
-        Puppet::CloudPack.expects(:ssh_remote_execute).twice.with do |server, login, command, keyfile|
+        Puppet::CloudPack.expects(:ssh_remote_execute).times(3).with do |server, login, command, keyfile|
           if command =~ /^bash -c 'chmod u\+x \S+gems\.sh; \S+gems\.sh'/
             # set that the command is valid when it matches the regex
             # the test will pass is this is set to true
@@ -251,7 +253,7 @@ describe Puppet::CloudPack do
             # return true for all invocations of ssh_remote_execute
             true
           end
-        end
+        end.returns({:exit_code => 0, :stdout => 'fakestdout'})
         subject.install(@server, @options)
         @is_command_valid.should be_true
       end
