@@ -648,6 +648,7 @@ module Puppet::CloudPack
         else
           Puppet.info "Failed to connect with issue #{e} (Retry #{retries})"
           Puppet.info "This may be because the machine is booting.  Retrying the connection..."
+          retry
         end
       rescue Errno::ECONNRESET => e
         if (retries += 1) > 10
