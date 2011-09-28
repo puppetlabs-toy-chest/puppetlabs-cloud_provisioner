@@ -352,14 +352,20 @@ module Puppet::CloudPack
 
       begin
         Puppet.notice 'Registering node ...'
-        data = { 'node' => { 'name' => certname } }
-        response = http.post('/nodes.json', data.to_pson, headers)
-        if (response.code == '201')
-          Puppet.notice 'Registering node ... Done'
+        # get the list of nodes that have been specified in the Dashboard
+        response = http.get('/nodes.json', headers )
+        nodes = handle_json_response(response, 'List nodes')
+        node = nodes.detect { |node| node['name'] == certname }
+        node_info = if node
+          Puppet.notice("Node: #{certname} already exists in Dashboard, not creating")
+          node
         else
-          Puppet.warning 'Registering node ... Failed'
-          Puppet.warning "Server responded with a #{response.code} status"
+          # create the node if it does not exist
+          data = { 'node' => { 'name' => certname } }
+          response = http.post('/nodes.json', data.to_pson, headers)
+          handle_json_response(response, 'Registering node', '201').first
         end
+        node_id = node_info['id']
 
         Puppet.notice 'Classifying node ...'
         data = { 'node_name' => certname, 'group_name' => options[:node_group] }
@@ -378,6 +384,19 @@ module Puppet::CloudPack
       end
 
       return nil
+    end
+
+    def handle_json_response(response, action, expected_code='200')
+      if response.code == expected_code
+        Puppet.notice "#{action} ... Done"
+        PSON.parse response.body
+      else
+        # I should probably raise an exception!
+        Puppet.warning "#{action} ... Failed"
+        Puppet.info("Body: #{response.body}")
+        Puppet.warning "Server responded with a #{response.code} status"
+        raise Puppet::Error, "Could not: #{action}, got #{response.code} expected #{expected_code}"
+      end
     end
 
     def create(options)
