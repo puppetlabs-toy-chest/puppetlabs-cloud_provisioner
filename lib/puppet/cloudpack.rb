@@ -367,6 +367,16 @@ module Puppet::CloudPack
         end
         node_id = node_info['id']
 
+        # checking if the specified group even exists
+        response = http.get('/node_groups.json', headers )
+        node_groups = handle_json_response(response, 'List groups')
+
+        node_group_info = node_groups.detect {|group| group['name'] == options[:node_group] }
+        unless node_group_info
+          raise Puppet::Error, "Group #{options[:node_group]} does not exist in Dashboard. Groups must exist before they can be assigned to nodes."
+        end
+        node_group_id = node_group_info['id']
+
         Puppet.notice 'Classifying node ...'
         data = { 'node_name' => certname, 'group_name' => options[:node_group] }
         response = http.post("/memberships.json", data.to_pson, headers)
