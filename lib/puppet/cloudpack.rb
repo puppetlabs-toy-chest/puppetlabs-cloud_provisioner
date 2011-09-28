@@ -338,7 +338,7 @@ module Puppet::CloudPack
       if options[:node_group]
         dashboard_classify(certname, options)
       else
-        Puppet.info('No classification method selected')
+        Puppet.notice('No classification method selected')
       end
     end
 
