@@ -235,7 +235,7 @@ module Puppet::CloudPack
       end
 
       action.option '--installer-payload=' do
-        summary 'The location of the Pupept Enterprise universal gzipped tarball'
+        summary 'The location of the Puppet Enterprise universal gzipped tarball'
         description <<-EOT
           Location of the Puppet enterprise universal tarball to be used
           for the installation. This option is only required if Puppet
@@ -243,12 +243,18 @@ module Puppet::CloudPack
           This tarball must be zipped.
         EOT
         before_action do |action, arguments, options|
-          options[:installer_payload] = File.expand_path(options[:installer_payload])
-          unless test 'f', options[:installer_payload]
-            raise ArgumentError, "Could not find file '#{options[:installer_payload]}'"
-          end
-          unless test 'r', options[:installer_payload]
-            raise ArgumentError, "Could not read from file '#{options[:installer_payload]}'"
+          type = Puppet::CloudPack.payload_type(options[:installer_payload])
+          case type
+          when :invalid
+            raise ArgumentError, "Invalid input '#{options[:installer_payload]}' for option installer-payload, should be a URL or a file path"
+          when :file_path
+            options[:installer_payload] = File.expand_path(options[:installer_payload])
+            unless test 'f', options[:installer_payload]
+              raise ArgumentError, "Could not find file '#{options[:installer_payload]}'"
+            end
+            unless test 'r', options[:installer_payload]
+              raise ArgumentError, "Could not read from file '#{options[:installer_payload]}'"
+            end
           end
           unless(options[:installer_payload] =~ /(tgz|gz)$/)
             Puppet.warning("Option: intaller-payload expects a .tgz or .gz file")
@@ -271,6 +277,19 @@ module Puppet::CloudPack
             raise ArgumentError, "Could not read from file '#{options[:installer_answers]}'"
           end
         end
+      end
+
+      action.option '--puppetagent-certname=' do
+        summary 'The Puppet Agent certificate name to configure on the target system'
+        description <<-EOT
+          This option allows you to specify an optional Puppet Agent
+          certificate name to configure on the target system.  This option
+          applies to the puppet-enterprise and puppet-enterprise-http
+          installation scripts.  If provided, this option will replace any
+          puppet agent certificate name provided in the puppet enterprise
+          answers file.  This certificate name will show up in the Puppet Dashboard
+          when the agent checks in for the first time.
+        EOT
       end
 
       action.option '--install-script=' do
@@ -581,7 +600,11 @@ module Puppet::CloudPack
         options[:keyfile] = nil
       end
 
-      options[:certname] ||= Guid.new.to_s
+      # Figure out if we need to be root
+      cmd_prefix = options[:login] == 'root' ? '' : 'sudo '
+
+      # FIXME: This appears to be an AWS assumption.  What about VMware with a plain IP?
+      # (Not necessarily a bug, just a yak to shave...)
       options[:public_dns_name] = server
 
       # FIXME We shouldn't try to connect if the answers file hasn't been provided
@@ -589,7 +612,7 @@ module Puppet::CloudPack
       connections = ssh_connect(server, options[:login], options[:keyfile])
 
       options[:tmp_dir] = File.join('/', 'tmp', Guid.new.to_s)
-      create_tmpdir_cmd = "mkdir #{options[:tmp_dir]}"
+      create_tmpdir_cmd = "bash -c 'umask 077; mkdir #{options[:tmp_dir]}'"
       ssh_remote_execute(server, options[:login], create_tmpdir_cmd, options[:keyfile])
 
       upload_payloads(connections[:scp], options)
@@ -600,11 +623,30 @@ module Puppet::CloudPack
       connections[:scp].upload(tmp_script_path, remote_script_path)
 
       # Finally, execute the installer script
-      install_command = "bash -c 'chmod u+x #{remote_script_path}; #{remote_script_path}'"
-      install_command = options[:login] == 'root' ? install_command : 'sudo ' + install_command
-      ssh_remote_execute(server, options[:login], install_command, options[:keyfile])
+      install_command = "#{cmd_prefix}bash -c 'chmod u+x #{remote_script_path}; #{remote_script_path}'"
+      results = ssh_remote_execute(server, options[:login], install_command, options[:keyfile])
+      if results[:exit_code] != 0 then
+        raise Puppet::Error, "The installation script exited with a non-zero exit status, indicating a failure.  It may help to run with --debug to see the script execution or to check the installation log file on the remote system in #{options[:tmp_dir]}."
+      end
 
-      options[:certname]
+      # At this point we may assume installation of Puppet succeeded since the
+      # install script returned with a zero exit code.
+
+      # Determine the certificate name as reported by the remote system.
+      certname_command = "#{cmd_prefix}puppet agent --configprint certname"
+      results = ssh_remote_execute(server, options[:login], certname_command)
+      if results[:exit_code] == 0 then
+        puppetagent_certname = results[:stdout].strip
+      else
+        Puppet.warn "Could not determine the remote puppet agent certificate name using #{certname_command}"
+        puppetagent_certname = nil
+      end
+
+      # Return value
+      {
+        'status'               => 'success',
+        'puppetagent_certname' => puppetagent_certname,
+      }
     end
 
     # This is the single place to make SSH calls.  It will handle collecting STDOUT
@@ -616,6 +658,7 @@ module Puppet::CloudPack
       Puppet.info "Executing remote command ..."
       Puppet.debug "Command: #{command}"
       buffer = String.new
+      stdout = String.new
       exit_code = nil
       # Figure out the options we need to pass to start.  This allows us to use SSH_AUTH_SOCK
       # if the end user specifies --keyfile=agent
@@ -625,6 +668,7 @@ module Puppet::CloudPack
         session.open_channel do |channel|
           channel.on_data do |ch, data|
             buffer << data
+            stdout << data
             if buffer =~ /\n/
               lines = buffer.split("\n")
               buffer = lines.length > 1 ? lines.pop : String.new
@@ -648,7 +692,7 @@ module Puppet::CloudPack
         end
       end
       Puppet.info "Executing remote command ... Done"
-      exit_code
+      { :exit_code => exit_code, :stdout => stdout }
     end
 
     def ssh_test_connect(server, login, keyfile = nil)
@@ -735,7 +779,7 @@ module Puppet::CloudPack
         end
       end
 
-      if options[:installer_payload]
+      if options[:installer_payload] and payload_type(options[:installer_payload]) == :file_path
         Puppet.notice "Uploading Puppet Enterprise tarball ..."
         scp.upload(options[:installer_payload], "#{options[:tmp_dir]}/puppet.tar.gz")
         Puppet.notice "Uploading Puppet Enterprise tarball ... Done"
@@ -824,6 +868,20 @@ module Puppet::CloudPack
         :resource_id => server.id
       )
       Puppet.notice('Creating tags for instance ... Done')
+    end
+
+    def payload_type(payload)
+      uri = begin
+        URI.parse(payload)
+      rescue URI::InvalidURIError => e
+        return :invalid
+      end
+      if uri.class.to_s =~ /URI::(FTP|HTTPS?)/
+        $1.downcase.to_sym
+      else
+        # assuming that everything else is a valid filepath
+        :file_path
+      end
     end
   end
 end

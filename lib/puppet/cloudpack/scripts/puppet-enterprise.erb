@@ -1,10 +1,36 @@
 #!/bin/bash
-# this assumes that the payload has already been delivered
-cd <%= options[:tmp_dir] %>
-# copied by the install action of cloudpack
+set -e
+set -u
+set -x
+
+# The installer action determines a temporary directory internally
+# This is not a user defined option.  You may assume this will be
+# a unique string of characters.
+cd '<%= options[:tmp_dir] %>'
 install_dir=puppet-enterprise
 mkdir "${install_dir}"
+
 tar -xvzf puppet.tar.gz --strip-components 1 -C "${install_dir}"
-grep -q '^q_puppetagent_certname' puppet.answers && (echo 'PE answers file already contains line q_puppetagent_certname';exit 1)
-echo "q_puppetagent_certname='<%= options[:certname] %>'" >> puppet.answers
-"${install_dir}/puppet-enterprise-installer" -a puppet.answers >& install.log
+
+# This is an option provided by the face install action.
+# If it is not provided, this environment variable will be
+# zero length, suitable for testing with -n and -z
+PUPPETAGENT_CERTNAME='<%= options[:puppetagent_certname] %>'
+
+# If the puppet agent certname has been given on the command line using
+# --puppetagent-certname=foobar then the environment variable above will be
+# nonzero length.  We should replace it in the answers file.
+# (Note, the answers file has been uploaded by the face action)
+if [[ -n "${PUPPETAGENT_CERTNAME}" ]]; then
+  # Let's play shuffle the files.
+  mv puppet.answers puppet.answers.orig
+  # Give me everything _except_ any agent certname specified in the answers file
+  grep -v '^q_puppetagent_certname' puppet.answers.orig > puppet.answers
+  # Append the user specified option from the command line arguments.
+  echo 'q_puppetagent_certname=<%= options[:puppetagent_certname] %>' >> puppet.answers
+fi
+
+# Finally, actually install Puppet Enterprise
+"${install_dir}"/puppet-enterprise-installer -a puppet.answers 2>&1 | tee install.log
+
+# vim:ft=sh
