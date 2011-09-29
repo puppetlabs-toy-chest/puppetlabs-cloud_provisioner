@@ -53,6 +53,17 @@ describe Puppet::Face[:node, :current] do
         opts = @options.update :installer_payload => '/dev/null/nonexistent.file'
         expect { subject.install('server', opts) }.to raise_error ArgumentError, /could not find/i
       end
+      ['http://foo:8080', 'https://bar', 'ftp://baz'].each do |url|
+        it "should not validate the installer payload for file existance when it is a url: #{url}" do
+          Puppet::CloudPack.expects(:install)
+          opts = @options.update :installer_payload => url
+          subject.install('server', opts)
+        end
+      end
+      it 'should detect invalid urls' do
+        opts = @options.update :installer_payload => 'invalid path'
+        expect { subject.install('server', opts) }.to raise_error ArgumentError, /Invalid input/
+      end
 
       it 'should validate the installer payload for readability' do
         File.chmod 0300, @options[:installer_payload]
@@ -104,26 +115,66 @@ describe Puppet::Face[:node, :current] do
     end
   end
 
-  describe 'valid options' do
+  describe 'when installing as root and non-root' do
+    let(:ssh_remote_execute_results) do { :exit_code => 0, :stdout => 'stdout' }; end
+    let(:root_options) do { :login => 'root', :keyfile => 'agent' }; end
     let(:user_options) do { :login => 'ubuntu', :keyfile => 'agent' }; end
+    it 'should use sudo when not root' do
+      # We (may) need a state machine here
+      installation = states('installation').starts_as('unstarted')
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('unstarted')).then(installation.is('date_checked'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('date_checked')).then(installation.is('installed'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('installed')).then(installation.is('finished'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).with("server", user_options[:login], 'sudo puppet agent --configprint certname').when(installation.is('finished'))
 
-    it 'should support using keys from an agent' do
-      Puppet::CloudPack.expects(:install).once.with() do |server, received_options|
-        received_options[:keyfile] == user_options[:keyfile]
-      end
       subject.install('server', user_options)
     end
+    it 'should not use sudo when root' do
+      # We (may) need a state machine here
+      installation = states('installation').starts_as('unstarted')
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('unstarted')).then(installation.is('date_checked'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('date_checked')).then(installation.is('installed'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('installed')).then(installation.is('finished'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).with("server", root_options[:login], 'puppet agent --configprint certname').when(installation.is('finished'))
 
-    it 'should not pass the string agent to Net::SSH' do
-      Net::SSH.expects(:start).times(3).with() do |server, login, options|
-        not options.has_key? :keys
+      subject.install('server', root_options)
+    end
+  end
+
+  describe 'valid options' do
+    describe 'keyfile option' do
+      let(:user_options) do { :login => 'ubuntu', :keyfile => 'agent' }; end
+      let(:ssh_remote_execute_results) do { :exit_code => 0, :stdout => 'stdout' }; end
+
+      it 'should support using keys from an agent' do
+        Puppet::CloudPack.expects(:install).once.with() do |server, received_options|
+          received_options[:keyfile] == user_options[:keyfile]
+        end
+        subject.install('server', user_options)
       end
-      subject.install('server', user_options)
+
+      it 'should not pass the string agent to ssh' do
+        Puppet::CloudPack.expects(:ssh_remote_execute).times(4).with() do |server, login, command, keyfile|
+          keyfile.should be_nil
+        end.returns(ssh_remote_execute_results)
+        subject.install('server', user_options)
+      end
+
+      it 'should raise an error if SSH_AUTH_SOCK is not set' do
+        ENV['SSH_AUTH_SOCK'] = nil
+        expect { subject.install('server', user_options) }.to raise_error ArgumentError, /SSH_AUTH_SOCK/
+      end
     end
 
-    it 'should raise an error if SSH_AUTH_SOCK is not set' do
-      ENV['SSH_AUTH_SOCK'] = nil
-      expect { subject.install('server', user_options) }.to raise_error ArgumentError, /SSH_AUTH_SOCK/
+    describe 'puppetagent-certname option' do
+      let(:user_options) do { :login => 'ubuntu', :keyfile => 'agent', :puppetagent_certname => 'jeffmaster' }; end
+
+      it 'should support setting the agent certificate name' do
+        Puppet::CloudPack.expects(:install).once.with() do |server, received_options|
+          received_options[:puppetagent_certname] == user_options[:puppetagent_certname]
+        end
+        subject.install('server', user_options)
+      end
     end
   end
 end

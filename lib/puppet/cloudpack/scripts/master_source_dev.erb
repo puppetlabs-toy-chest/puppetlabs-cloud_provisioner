@@ -47,7 +47,7 @@ cat >/etc/puppet/puppet.conf <<EOF
   node_terminus = exec
   external_nodes = /usr/bin/env PUPPET_DASHBOARD_URL=http://localhost:3000 /usr/local/dev/puppet-dashboard/bin/external_node
   environment = <%= options[:environment] %>
-  certname = <%= options[:certname] %>
+  certname = <%= options[:puppetagent_certname] %>
   certdnsnames = <%= options[:public_dns_name] %>:$(facter fqdn)
   report = true
   autosign = /etc/puppet/autosign.conf
