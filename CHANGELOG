@@ -1,3 +1,35 @@
+Mon Oct 10 2011 Michael Stahnke <stahnma@puppetlabs.com> - v0.6.0rc2
+* Fill in license template
+* (#9805) Ensure tempfiles do not get garbage collected
+* (#9781) Add test coverage for dashboard classify
+* (#9670) Check if node groups are already assigned to nodes
+* (#9681) Fail if the specified node group does not exist
+* (#9679) Check if node exists before creating
+* (#9621) Return the puppet agent certname to the user
+* (#9563) Retry when Errno::ETIMEDOUT is encountered.
+* (#9778) Log no classification method selected by default
+* (#9699) Fix keyname option
+* (#9621) Fix misuse of --certname option in install action
+* (#9621) Install Puppet Enterprise using HTTP get
+* (#9621) Add logic for install payload to handle remote urls
+* (#9590) Add ProgressBar class to draw progress bars
+* (#9608) Ensure --keyfile agent is always a downcase value
+* (#9618) PE script should accept any tar
+* (#9608) Add ssh-agent support via --keyfile=agent
+* (maint) Update watchr autotest script with growl
+* (#9585)(UX) Add list_keynames action, rename keypair to keyname
+* Remove UTF-8 characters in comments causing error: invalid multibyte char (US-ASCII)
+* (#9581) Node_aws actions should require face
+* (#9536) Explicitly catch tcp connection resets.
+* (#9426) Add acceptance tests
+* (#9510) Increase timeout wrapped around ssh
+* (#9442) Fixup puppet node_aws list example output
+* (#9442) Rename EC2 specific actions to node_aws subcommand
+* (#8184) update spec test to work with Fog v0.11.0
+* (#9048) Update tests to expand path
+* Whitespace only change.
+* (#8706) Fix spec tests of option validation
+
 2011-07-20 Jeff McCune <jeff@puppetlabs.com> - v0.6.0rc1
 * Initial public release
 * Add --type option to launch different EC2 instance sizes
