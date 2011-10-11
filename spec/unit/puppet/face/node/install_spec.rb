@@ -4,11 +4,14 @@ require 'tempfile'
 
 describe Puppet::Face[:node, :current] do
   before :each do
+    @keyfile = Tempfile.new('file_on_disk.txt')
+    @installer_payload = Tempfile.new('some.tar.gz')
+    @installer_answers = Tempfile.new('some.answers')
     @options = {
       :login             => 'ubuntu',
-      :keyfile           => Tempfile.new('file_on_disk.txt').path,
-      :installer_payload => Tempfile.new('some.tar.gz').path,
-      :installer_answers => Tempfile.new('some.answers').path
+      :keyfile           => @keyfile.path,
+      :installer_payload => @installer_payload.path,
+      :installer_answers => @installer_answers.path
     }
     ENV['SSH_AUTH_SOCK'] = '/tmp/foo.socket'
   end
