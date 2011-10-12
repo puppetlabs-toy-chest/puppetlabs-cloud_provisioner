@@ -382,7 +382,7 @@ module Puppet::CloudPack
           # create the node if it does not exist
           data = { 'node' => { 'name' => certname } }
           response = http.post('/nodes.json', data.to_pson, headers)
-          handle_json_response(response, 'Registering node', '201').first
+          handle_json_response(response, 'Registering node', '201')
         end
         node_id = node_info['id']
 
