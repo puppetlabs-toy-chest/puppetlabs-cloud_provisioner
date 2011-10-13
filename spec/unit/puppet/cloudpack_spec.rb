@@ -287,7 +287,7 @@ describe Puppet::CloudPack do
         http_response_mock(:body => '[{"name":"foo","id":"1"}]')
       end
       let :ok_add do
-        http_response_mock(:code => '201', :body => '[{"id":"1"}]')
+        http_response_mock(:code => '201', :body => '{"id":"1"}')
       end
       let :ok_member_list do
         http_response_mock(:body => '[{"node_group_id":"1", "node_id":"1"}]')
