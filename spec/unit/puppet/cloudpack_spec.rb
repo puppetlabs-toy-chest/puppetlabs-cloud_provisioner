@@ -228,17 +228,19 @@ describe Puppet::CloudPack do
         @options[:login] = 'dan'
         Puppet::CloudPack.expects(:ssh_connect).with(@server, 'dan', @keyfile.path).returns(@mock_connection_tuple)
         @is_command_valid = false
+        @has_keyfile = true
         Puppet::CloudPack.expects(:ssh_remote_execute).times(3).with do |server, login, command, keyfile|
           if command =~ /^sudo bash -c 'chmod u\+x \S+gems\.sh; \S+gems\.sh'/
             # set that the command is valid when it matches the regex
             # the test will pass is this is set to true
             @is_command_valid = true
-          else
-            true
           end
+          @has_keyfile = keyfile == @keyfile.path and @has_keyfile
+          true
         end.returns(ssh_remote_execute_return_hash)
         subject.install(@server, @options)
         @is_command_valid.should be_true
+        @has_keyfile.should be_true
       end
       it 'should not add sudo to command when login is root' do
         @options[:login] = 'root'
