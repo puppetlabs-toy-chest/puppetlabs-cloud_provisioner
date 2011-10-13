@@ -635,7 +635,8 @@ module Puppet::CloudPack
 
       # Determine the certificate name as reported by the remote system.
       certname_command = "#{cmd_prefix}puppet agent --configprint certname"
-      results = ssh_remote_execute(server, options[:login], certname_command)
+      results = ssh_remote_execute(server, options[:login], certname_command, options[:keyfile])
+
       if results[:exit_code] == 0 then
         puppetagent_certname = results[:stdout].strip
       else
@@ -646,7 +647,7 @@ module Puppet::CloudPack
       # Return value
       {
         'status'               => 'success',
-        'puppetagent_certname' => puppetagent_certname,
+        'puppetagent_certname' => puppetagent_certname
       }
     end
 
@@ -665,33 +666,38 @@ module Puppet::CloudPack
       # if the end user specifies --keyfile=agent
       ssh_opts = keyfile ? { :keys => [ keyfile ] } : { }
       # Start
-      Net::SSH.start(server, login, ssh_opts) do |session|
-        session.open_channel do |channel|
-          channel.on_data do |ch, data|
-            buffer << data
-            stdout << data
-            if buffer =~ /\n/
-              lines = buffer.split("\n")
-              buffer = lines.length > 1 ? lines.pop : String.new
-              lines.each do |line|
-                Puppet.debug(line)
+      begin
+        Net::SSH.start(server, login, ssh_opts) do |session|
+          session.open_channel do |channel|
+            channel.on_data do |ch, data|
+              buffer << data
+              stdout << data
+              if buffer =~ /\n/
+                lines = buffer.split("\n")
+                buffer = lines.length > 1 ? lines.pop : String.new
+                lines.each do |line|
+                  Puppet.debug(line)
+                end
               end
             end
-          end
-          channel.on_eof do |ch|
-            # Display anything remaining in the buffer
-            unless buffer.empty?
-              Puppet.debug(buffer)
+            channel.on_eof do |ch|
+              # Display anything remaining in the buffer
+              unless buffer.empty?
+                Puppet.debug(buffer)
+              end
             end
+            channel.on_request("exit-status") do |ch, data|
+              exit_code = data.read_long
+              Puppet.debug("SSH Command Exit Code: #{exit_code}")
+            end
+            # Finally execute the command
+            channel.exec(command)
           end
-          channel.on_request("exit-status") do |ch, data|
-            exit_code = data.read_long
-            Puppet.debug("SSH Command Exit Code: #{exit_code}")
-          end
-          # Finally execute the command
-          channel.exec(command)
         end
+      rescue Net::SSH::AuthenticationFailed => user
+        raise Puppet::Error, "Authentication failure for user #{user}. Please check the keyfile and try again."
       end
+
       Puppet.info "Executing remote command ... Done"
       { :exit_code => exit_code, :stdout => stdout }
     end
