@@ -254,8 +254,28 @@ describe Puppet::CloudPack do
             true
           end
         end.returns({:exit_code => 0, :stdout => 'fakestdout'})
-        subject.install(@server, @options)
+        result = subject.install(@server, @options)
+        result['status'].should == 'success'
+        result['puppetagent_certname'].should == 'fakestdout'
         @is_command_valid.should be_true
+      end
+    end
+    describe '#init' do
+      it 'should use the certname from install to classify and sign certificate' do
+        options = {}
+        dnsname = 'my_dnsname'
+        puppetagent_certname = 'certname'
+        face_mock = mock('Puppet::Indirector::Face')
+        face_mock.expects(:sign).with(puppetagent_certname, {:ca_location => :remote})
+        Puppet::Face.expects(:[]).with(:certificate, '0.0.1').returns(face_mock)
+        subject.expects(:install).with(dnsname, options).returns(
+          {
+            'status'               => 'success',
+            'puppetagent_certname' => puppetagent_certname,
+          }
+        )
+        subject.expects(:classify).with(puppetagent_certname, options)
+        subject.init(dnsname, options)
       end
     end
     describe '#classify' do
