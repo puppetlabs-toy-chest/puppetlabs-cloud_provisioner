@@ -370,7 +370,7 @@ module Puppet::CloudPack
       headers = { 'Content-Type' => 'application/json' }
 
       begin
-        Puppet.notice 'Registering node ...'
+        Puppet.notice "Registering node: #{certname} ..."
         # get the list of nodes that have been specified in the Dashboard
         response = http.get('/nodes.json', headers )
         nodes = handle_json_response(response, 'List nodes')
@@ -563,7 +563,8 @@ module Puppet::CloudPack
     end
 
     def init(server, options)
-      certname = install(server, options)
+      install_status = install(server, options)
+      certname = install_status['puppetagent_certname']
       options.delete(:_destroy_server_at_exit)
 
       Puppet.notice "Puppet is now installed on: #{server}"
