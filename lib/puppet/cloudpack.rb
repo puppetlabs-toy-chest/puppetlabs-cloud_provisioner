@@ -572,13 +572,13 @@ module Puppet::CloudPack
       classify(certname, options)
 
       # HACK: This should be reconciled with the Certificate Face.
-      opts = options.merge(:ca_location => :remote)
+      cert_options = {:ca_location => :remote}
 
       # TODO: Wait for C.S.R.?
 
       Puppet.notice "Signing certificate ..."
       begin
-        Puppet::Face[:certificate, '0.0.1'].sign(certname, opts)
+        Puppet::Face[:certificate, '0.0.1'].sign(certname, cert_options)
         Puppet.notice "Signing certificate ... Done"
       rescue Puppet::Error => e
         # TODO: Write useful next steps.
