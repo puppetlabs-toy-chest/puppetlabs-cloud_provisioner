@@ -342,6 +342,20 @@ module Puppet::CloudPack
     end
 
     def add_classify_options(action)
+      action.option '--dashboard_server=', '--ds=' do
+        summary 'The Puppet Dashboard URL to connect to.'
+        default_to do
+          Puppet[:server]
+        end
+      end
+
+      action.option '--dashboard_port=', '--dp=' do
+        summary 'The port Puppet Dashboard is listening on'
+        default_to do
+          3000
+        end
+      end
+
       action.option '--node-group=', '--as=' do
         summary 'The Puppet Dashboard node group to add to.'
       end
@@ -362,8 +376,8 @@ module Puppet::CloudPack
     end
 
     def dashboard_classify(certname, options)
-      Puppet.info "Using http://#{Puppet[:report_server]}:#{Puppet[:report_port]} as Dashboard."
-      http = Puppet::Network::HttpPool.http_instance(Puppet[:report_server], Puppet[:report_port])
+      Puppet.info "Using http://#{options[:dashboard_server]}:#{options[:dashboard_port]} as Dashboard."
+      http = Puppet::Network::HttpPool.http_instance(options[:dashboard_server], options[:dashboard_port])
 
       # Workaround for the fact that Dashboard is typically insecure.
       http.use_ssl = false
@@ -409,8 +423,8 @@ module Puppet::CloudPack
         end
       rescue Errno::ECONNREFUSED
         Puppet.warning 'Registering node ... Error'
-        Puppet.err "Could not connect to host http://#{Puppet[:report_server]}:#{Puppet[:report_port]}"
-        Puppet.err "Check your report_server and report_port options"
+        Puppet.err "Could not connect to host http://#{options[:dashboard_server]}:#{options[:dashboard_port]}"
+        Puppet.err "Check your --dashboard_server and --dashboard_port options"
         exit(1)
       end
 
