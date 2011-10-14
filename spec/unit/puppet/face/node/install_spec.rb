@@ -128,7 +128,7 @@ describe Puppet::Face[:node, :current] do
       Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('unstarted')).then(installation.is('date_checked'))
       Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('date_checked')).then(installation.is('installed'))
       Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('installed')).then(installation.is('finished'))
-      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).with("server", user_options[:login], 'sudo puppet agent --configprint certname').when(installation.is('finished'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).with("server", user_options[:login], 'sudo puppet agent --configprint certname', nil).when(installation.is('finished'))
 
       subject.install('server', user_options)
     end
@@ -138,7 +138,7 @@ describe Puppet::Face[:node, :current] do
       Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('unstarted')).then(installation.is('date_checked'))
       Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('date_checked')).then(installation.is('installed'))
       Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).when(installation.is('installed')).then(installation.is('finished'))
-      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).with("server", root_options[:login], 'puppet agent --configprint certname').when(installation.is('finished'))
+      Puppet::CloudPack.expects(:ssh_remote_execute).returns(ssh_remote_execute_results).with("server", root_options[:login], 'puppet agent --configprint certname', nil).when(installation.is('finished'))
 
       subject.install('server', root_options)
     end
