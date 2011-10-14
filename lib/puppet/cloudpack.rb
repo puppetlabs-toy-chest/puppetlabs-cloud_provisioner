@@ -370,7 +370,7 @@ module Puppet::CloudPack
       headers = { 'Content-Type' => 'application/json' }
 
       begin
-        Puppet.notice 'Registering node ...'
+        Puppet.notice "Registering node: #{certname} ..."
         # get the list of nodes that have been specified in the Dashboard
         response = http.get('/nodes.json', headers )
         nodes = handle_json_response(response, 'List nodes')
@@ -563,7 +563,8 @@ module Puppet::CloudPack
     end
 
     def init(server, options)
-      certname = install(server, options)
+      install_status = install(server, options)
+      certname = install_status['puppetagent_certname']
       options.delete(:_destroy_server_at_exit)
 
       Puppet.notice "Puppet is now installed on: #{server}"
@@ -571,13 +572,13 @@ module Puppet::CloudPack
       classify(certname, options)
 
       # HACK: This should be reconciled with the Certificate Face.
-      opts = options.merge(:ca_location => :remote)
+      cert_options = {:ca_location => :remote}
 
       # TODO: Wait for C.S.R.?
 
       Puppet.notice "Signing certificate ..."
       begin
-        Puppet::Face[:certificate, '0.0.1'].sign(certname, opts)
+        Puppet::Face[:certificate, '0.0.1'].sign(certname, cert_options)
         Puppet.notice "Signing certificate ... Done"
       rescue Puppet::Error => e
         # TODO: Write useful next steps.
