@@ -13,7 +13,7 @@ describe Puppet::Face[:node, :current] do
       # This is needed when setting up expectations.
       # Calls through the Faces API will append an
       # "extra" option containing a hash of arguments.
-      @expected_options = {:extra => {} }.merge(@options)
+      @expected_options = {:enc_port => 3000, :node_group => 'webserver', :extra => {}, :enc_server => 'puppet'}.merge(@options)
     end
     describe '(node-group)' do
       it 'should not call dashboard_classify if node_group is not supplied' do
