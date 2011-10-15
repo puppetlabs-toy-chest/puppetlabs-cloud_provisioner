@@ -289,10 +289,7 @@ describe Puppet::CloudPack do
     end
     describe '#dashboard_classify' do
       before :each do
-        Puppet[:report_server] = 'server'
-        Puppet[:report_port] = '3000'
         @http = mock('Net::Http')
-        Puppet::Network::HttpPool.expects(:http_instance).with('server', '3000').returns @http
         @http.expects('use_ssl=').with(false)
         @headers = { 'Content-Type' => 'application/json' }
       end
@@ -320,42 +317,58 @@ describe Puppet::CloudPack do
       let :http_fail do
         http_response_mock(:code => '400', :body => '[]')
       end
-      it 'should create a node if it does not already exist in Dashboard' do
-        @http.expects(:get).with('/nodes.json', @headers).returns empty_list
-        @http.expects(:post).with('/nodes.json', {'node' => {'name' => 'certname'}}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
-        @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
-        @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns ok_member_list
-        Puppet::CloudPack.classify('certname', :node_group => 'foo')
+      describe 'default options' do
+        it 'should use the default enc options' do
+Puppet::Network::HttpPool.http_instance('puppet', 3000)
+          Puppet::Network::HttpPool.expects(:http_instance).with('puppet', 3000).returns @http
+          @http.expects(:get).with('/nodes.json', {'Content-Type' => 'application/json'}).returns ok_host_list
+          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
+          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns ok_member_list
+          Puppet::Face[:node, :current].classify('certname', :node_group => 'foo')
+        end
       end
+      describe 'non default options' do
+        before :each do
+          @options = { :node_group => 'foo', :enc_server => 'server', :enc_port => '3000' }
+          Puppet::Network::HttpPool.expects(:http_instance).with('server', '3000').returns @http
+        end
+        it 'should create a node if it does not already exist in Dashboard' do
+          @http.expects(:get).with('/nodes.json', @headers).returns empty_list
+          @http.expects(:post).with('/nodes.json', {'node' => {'name' => 'certname'}}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
+          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
+          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns ok_member_list
+         subject.classify('certname', @options)
+        end
 
-      it 'should not create the node if it already exists in Dashboard' do
-        @http.expects(:get).with('/nodes.json', @headers).returns ok_host_list
-        @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
-        @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns empty_list
-        @http.expects(:post).with('/memberships.json', {'group_name'=> 'foo','node_name' => 'certname'}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
-        Puppet::CloudPack.classify('certname', :node_group => 'foo')
+        it 'should not create the node if it already exists in Dashboard' do
+          @http.expects(:get).with('/nodes.json', @headers).returns ok_host_list
+          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
+          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns empty_list
+          @http.expects(:post).with('/memberships.json', {'group_name'=> 'foo','node_name' => 'certname'}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
+          subject.classify('certname', @options)
 
-      end
-      it 'should not add the node group to the node if it had already been added' do
-        @http.expects(:get).with('/nodes.json', @headers).returns empty_list
-        @http.expects(:post).with('/nodes.json', {'node' => {'name' => 'certname'}}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
-        @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
-        @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns ok_member_list
-        @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).never
-        Puppet::CloudPack.classify('certname', :node_group => 'foo')
-      end
-      it 'should add the node group to the node if it was not already added' do
-        @http.expects(:get).with('/nodes.json', @headers).returns empty_list
-        @http.expects(:post).with('/nodes.json', {'node' => {'name' => 'certname'}}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
-        @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
-        @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns empty_list
-        @http.expects(:post).with('/memberships.json', {'group_name'=> 'foo','node_name' => 'certname'}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
-        Puppet::CloudPack.classify('certname', :node_group => 'foo')
-      end
-      it 'should fail when it cannot find the node group in the dashboard' do
-        @http.expects(:get).with('/nodes.json', @headers).returns ok_host_list
-        @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns empty_list
-        expect { Puppet::CloudPack.classify('certname', :node_group => 'foo') }.should raise_error(Puppet::Error, /Groups must exist before they can be assigned to nodes/)
+        end
+        it 'should not add the node group to the node if it had already been added' do
+          @http.expects(:get).with('/nodes.json', @headers).returns empty_list
+          @http.expects(:post).with('/nodes.json', {'node' => {'name' => 'certname'}}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
+          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
+          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns ok_member_list
+          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).never
+          subject.classify('certname', @options)
+        end
+        it 'should add the node group to the node if it was not already added' do
+          @http.expects(:get).with('/nodes.json', @headers).returns empty_list
+          @http.expects(:post).with('/nodes.json', {'node' => {'name' => 'certname'}}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
+          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
+          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns empty_list
+          @http.expects(:post).with('/memberships.json', {'group_name'=> 'foo','node_name' => 'certname'}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
+          subject.classify('certname', @options)
+        end
+        it 'should fail when it cannot find the node group in the dashboard' do
+          @http.expects(:get).with('/nodes.json', @headers).returns ok_host_list
+          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns empty_list
+          expect { subject.classify('certname', @options) }.should raise_error(Puppet::Error, /Groups must exist before they can be assigned to nodes/)
+        end
       end
     end
     describe '#handle_json_response' do

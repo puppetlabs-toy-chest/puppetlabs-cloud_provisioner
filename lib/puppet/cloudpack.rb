@@ -342,6 +342,30 @@ module Puppet::CloudPack
     end
 
     def add_classify_options(action)
+      action.option '--enc-server=' do
+        summary 'The External Node Classifier URL.'
+        description <<-EOT
+          The URL of the External Node Classifier.
+          This currently only supports the Dashboard
+          as an external node classifier.
+        EOT
+        default_to do
+          Puppet[:server]
+        end
+      end
+
+      action.option '--enc-port=' do
+        summary 'The External Node Classifier Port'
+        description <<-EOT
+          The port of the External Node Classifier.
+          This currently only supports the Dashboard
+          as an external node classifier.
+        EOT
+        default_to do
+          3000
+        end
+      end
+
       action.option '--node-group=', '--as=' do
         summary 'The Puppet Dashboard node group to add to.'
       end
@@ -362,8 +386,8 @@ module Puppet::CloudPack
     end
 
     def dashboard_classify(certname, options)
-      Puppet.info "Using http://#{Puppet[:report_server]}:#{Puppet[:report_port]} as Dashboard."
-      http = Puppet::Network::HttpPool.http_instance(Puppet[:report_server], Puppet[:report_port])
+      Puppet.info "Using http://#{options[:enc_server]}:#{options[:enc_port]} as Dashboard."
+      http = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
 
       # Workaround for the fact that Dashboard is typically insecure.
       http.use_ssl = false
@@ -409,8 +433,8 @@ module Puppet::CloudPack
         end
       rescue Errno::ECONNREFUSED
         Puppet.warning 'Registering node ... Error'
-        Puppet.err "Could not connect to host http://#{Puppet[:report_server]}:#{Puppet[:report_port]}"
-        Puppet.err "Check your report_server and report_port options"
+        Puppet.err "Could not connect to host http://#{options[:enc_server]}:#{options[:enc_port]}"
+        Puppet.err "Check your --enc_server and --enc_port options"
         exit(1)
       end
 
