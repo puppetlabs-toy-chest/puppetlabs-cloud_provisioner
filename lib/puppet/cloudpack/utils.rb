@@ -12,7 +12,11 @@ module Puppet::CloudPack::Utils
       yield
     rescue 
       sleep pause if pause > 0
-      retry if (retries -= 1) > 0 else raise
+      if (retries -= 1) > 0
+        retry
+      else 
+        raise
+      end
     end
   end
 end
