@@ -5,6 +5,7 @@ require 'fog'
 require 'net/ssh'
 require 'puppet/network/http_pool'
 require 'puppet/cloudpack/progressbar'
+require 'puppet/cloudpack/utils'
 require 'timeout'
 
 module Puppet::CloudPack
@@ -894,11 +895,13 @@ module Puppet::CloudPack
 
     def create_tags(tags, server)
       Puppet.notice('Creating tags for instance ...')
-      tags.create(
-        :key         => 'Created-By',
-        :value       => 'Puppet',
-        :resource_id => server.id
-      )
+      Puppet::CloudPack::Utils.retry_action(10,2) do
+        tags.create(
+          :key         => 'Created-By',
+          :value       => 'Puppet',
+          :resource_id => server.id
+        )
+      end
       Puppet.notice('Creating tags for instance ... Done')
     end
 
