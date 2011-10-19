@@ -728,56 +728,21 @@ module Puppet::CloudPack
 
     def ssh_test_connect(server, login, keyfile = nil)
       Puppet.notice "Waiting for SSH response ..."
-      # TODO I'd really like this all to be based on wall time and not retry counts.
-      # We should only really block for 3 minutes or so.
-      retries = 0
-      begin
-        status = Timeout::timeout(25) do
+
+      retry_exceptions = {
+          Net::SSH::AuthenticationFailed => "Failed to connect. This may be because the machine is booting.\nRetrying the connection...",
+          Errno::ECONNREFUSED            => " Failed to connect.\nThis may be because the machine is booting.  Retrying the connection...",
+          Errno::ETIMEDOUT               => "Failed to connect.\nThis may be because the machine is booting.  Retrying the connection..",
+          Errno::ECONNRESET              => "Connection reset.\nRetrying the connection...",
+          Timeout::Error                 => "Connection test timed-out.\nThis may be because the machine is booting.  Retrying the connection..."
+      }
+
+      Puppet::CloudPack::Utils.retry_action( :timeout => 250, :retry_exceptions => retry_exceptions ) do 
+        Timeout::timeout(25) do
           ssh_remote_execute(server, login, "date", keyfile)
         end
-      rescue Net::SSH::AuthenticationFailed, Errno::ECONNREFUSED => e
-        if (retries += 1) > 10
-          Puppet.err "Could not connect via SSH.  The error is: #{e}"
-          Puppet.err "Please check to make sure your ssh key is working properly, e.g. ssh #{login}@#{server}"
-          raise Puppet::Error, "Check your authentication credentials and try again."
-        else
-          Puppet.info "Failed to connect with issue #{e} (Retry #{retries})"
-          Puppet.info "This may be because the machine is booting.  Retrying the connection..."
-          sleep 5
-        end
-        retry
-      rescue Errno::ETIMEDOUT => e
-        if (retries += 1) > 3
-          Puppet.err "Could not connect via SSH.  The error is: #{e}"
-          Puppet.err "This indicates the machine has not even come online yet.  Please check if the system launched."
-          raise Puppet::Error, "Too many timeouts trying to connect."
-        else
-          Puppet.info "Failed to connect with issue #{e} (Retry #{retries})"
-          Puppet.info "This may be because the machine is booting.  Retrying the connection..."
-          retry
-        end
-      rescue Errno::ECONNRESET => e
-        if (retries += 1) > 10
-          Puppet.err "Connection reset.  The error is: #{e}"
-          raise Puppet::Error, "Max number of retries for ssh connetion exceeded"
-        else
-          Puppet.err "Connection reset with message: #{e} (Retry #{retries})"
-          Puppet.err "Retrying..."
-          sleep 5
-        end
-      rescue Timeout::Error => e
-        if (retries += 1) > 5
-          Puppet.err "Could not connect via SSH.  The error is: #{e}"
-          raise Puppet::Error, "Too many timeouts trying to connect."
-        else
-          Puppet.info "Connection test timed-out: (Retry #{retries})"
-          Puppet.info "This may be because the machine is booting.  Retrying the connection..."
-          retry
-        end
-      rescue Exception => e
-        Puppet.err("Unhandled connection robustness error: #{e.class} [#{e.inspect}]")
-        raise e
       end
+
       Puppet.notice "Waiting for SSH response ... Done"
       true
     end

@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'puppet/cloudpack'
+require 'puppet/cloudpack/utils'
 
 module Fog
   module SSH
@@ -408,7 +409,7 @@ Puppet::Network::HttpPool.http_instance('puppet', 3000)
           end
           it 'should fail eventually' do
             Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Net::SSH::AuthenticationFailed, 'root')
-            expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.should raise_error(Puppet::Error, /auth/)
+            expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.should raise_error(Puppet::CloudPack::Utils::RetryException::Timeout)
           end
         end
       end
