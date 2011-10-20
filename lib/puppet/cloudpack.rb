@@ -7,6 +7,7 @@ require 'puppet/network/http_pool'
 require 'puppet/cloudpack/progressbar'
 require 'puppet/cloudpack/utils'
 require 'timeout'
+require 'ruby-debug'
 
 module Puppet::CloudPack
   require 'puppet/cloudpack/installer'
@@ -367,9 +368,44 @@ module Puppet::CloudPack
         end
       end
 
+      action.option '--enc-ssl' do
+        summary 'Use SSL to communicate with the ENC'
+        description <<-EOT
+          This options turns on SSL communication to
+          your ENC.
+        EOT
+      end
+
+      action.option '--enc-auth-user=' do
+        summary 'User name for basic authentication to ENC'
+        description <<-EOT
+          The Puppet Dashboard can be secured using
+          Apache's authentication realm support. For
+          it to function properly you need to set a
+          user name.
+        EOT
+        default_to do
+          nil
+        end
+      end
+
+      action.option '--enc-auth-passwd=' do
+        summary 'Password for basic authentication to ENC'
+        description <<-EOT
+          The Puppet Dashboard can be secured using
+          Apache's authentication realm support. For
+          it to function properly you must set a
+          a password.
+        EOT
+        default_to do
+          nil
+        end
+      end
+
       action.option '--node-group=', '--as=' do
         summary 'The Puppet Dashboard node group to add to.'
       end
+
     end
 
     def bootstrap(options)
@@ -391,28 +427,41 @@ module Puppet::CloudPack
       http = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
 
       # Workaround for the fact that Dashboard is typically insecure.
-      http.use_ssl = false
-      headers = { 'Content-Type' => 'application/json' }
+      http.use_ssl = options[:enc_ssl] ? true : false
+
+      content_type = 'applicaiton/json'
 
       begin
-        Puppet.notice "Registering node: #{certname} ..."
-        # get the list of nodes that have been specified in the Dashboard
-        response = http.get('/nodes.json', headers )
-        nodes = handle_json_response(response, 'List nodes')
-        node = nodes.detect { |node| node['name'] == certname }
-        node_info = if node
-          Puppet.notice("Node: #{certname} already exists in Dashboard, not creating")
-          node
-        else
-          # create the node if it does not exist
-          data = { 'node' => { 'name' => certname } }
-          response = http.post('/nodes.json', data.to_pson, headers)
-          handle_json_response(response, 'Registering node', '201')
-        end
+        http.start do |http|
+          Puppet.notice "Registering node: #{certname} ..."
+          # get the list of nodes that have been specified in the Dashboard
+          request = Net::HTTP::Get.new('/nodes.json')
+          request.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) if ! options[:enc_auth_user].nil?
+          request.set_content_type(content_type)
+          response = http.request(request)
+          nodes = handle_json_response(response, 'List nodes')
+          node = nodes.detect { |node| node['name'] == certname }
+
+          node_info = if node
+            Puppet.notice("Node: #{certname} already exists in Dashboard, not creating")
+            node
+          else
+            # create the node if it does not exist
+            request = Net::HTTP::Post.new('/nodes.json')
+            data = { 'node' => { 'name' => certname } }
+            request.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) if ! options[:enc_auth_user].nil?
+            request.set_content_type(content_type)
+            request.set_form_data(data)
+            response = http.request(request)
+            handle_json_response(response, 'Registering node', '201')
+          end
         node_id = node_info['id']
 
         # checking if the specified group even exists
-        response = http.get('/node_groups.json', headers )
+        request = Net::HTTP::Get.new('/node_groups.json')
+        request.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) if ! options[:enc_auth_user].nil?
+        request.set_content_type(content_type)
+        response = http.request(request)
         node_groups = handle_json_response(response, 'List groups')
 
         node_group_info = node_groups.detect {|group| group['name'] == options[:node_group] }
@@ -422,16 +471,24 @@ module Puppet::CloudPack
         node_group_id = node_group_info['id']
 
         Puppet.notice 'Classifying node ...'
-        response = http.get("/memberships.json", headers)
+        request = Net::HTTP::Get.new('/memberships.json')
+        request.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) if ! options[:enc_auth_user].nil?
+        request.set_content_type(content_type)
+        response = http.request(request)
         memberships = handle_json_response(response, 'List memberships')
         if memberships.detect{ |members| members['node_group_id'] == node_group_id and members['node_id'] == node_id }
           Puppet.warning("Group #{options[:node_group]} already added to node #{options[:node_name]}, nothing to do")
         else
           # add the node group to the node if the relationship did not already exist
+          request = Net::HTTP::Post.new('/memberships.json')
           data = { 'node_name' => certname, 'group_name' => options[:node_group] }
-          response = http.post("/memberships.json", data.to_pson, headers)
+          request.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) if ! options[:enc_auth_user].nil?
+          request.set_content_type(content_type)
+          request.set_form_data(data)
+          response = http.request(request)
           handle_json_response(response, 'Classify node', '201')
         end
+      end
       rescue Errno::ECONNREFUSED
         Puppet.warning 'Registering node ... Error'
         Puppet.err "Could not connect to host http://#{options[:enc_server]}:#{options[:enc_port]}"
@@ -885,3 +942,5 @@ module Puppet::CloudPack
     end
   end
 end
+
+
