@@ -19,7 +19,14 @@ module Puppet::CloudPack
       default_options = { :region => 'us-east-1', :platform => 'AWS', :install_script => 'gems' }
       default_options.merge(options)
     end
-
+    def add_availability_zone_option(action)
+      action.option '--availability-zone=' do
+        summary 'AWS availability zone.'
+        description <<-EOT
+          Specifies the availability zone into which the VM will be created
+        EOT
+     end
+    end
     def add_region_option(action)
       action.option '--region=' do
         summary "The geographic region of the instance. Defaults to us-east-1."
@@ -80,6 +87,7 @@ module Puppet::CloudPack
     def add_create_options(action)
       add_platform_option(action)
       add_region_option(action)
+      add_availability_zone_option(action)
 
       action.option '--image=', '-i=' do
         summary 'AMI to use when creating the instance.'
@@ -472,7 +480,8 @@ module Puppet::CloudPack
         :image_id   => options[:image],
         :key_name   => options[:keyname],
         :groups     => options[:group],
-        :flavor_id  => options[:type]
+        :flavor_id  => options[:type],
+        :availability_zone => options[:availability_zone]
       )
 
       # This is the earliest point we have knowledge of the instance ID
