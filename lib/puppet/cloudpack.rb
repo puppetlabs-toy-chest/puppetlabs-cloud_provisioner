@@ -16,7 +16,7 @@ module Puppet::CloudPack
     # defaults, so they all call merge_default_options() to ensure the keys are
     # set.
     def merge_default_options(options)
-      default_options = { :region => 'us-east-1', :platform => 'AWS', :install_script => 'gems' }
+      default_options = { :region => 'us-east-1', :platform => 'AWS', :install_script => 'puppet-community' }
       default_options.merge(options)
     end
 
