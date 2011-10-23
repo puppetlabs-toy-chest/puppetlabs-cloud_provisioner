@@ -539,7 +539,7 @@ module Puppet::CloudPack
         hsh[s.id] = {
           "id"         => s.id,
           "state"      => s.state,
-          "key_name"   => s.key_name,
+          "keyname"    => s.key_name,
           "dns_name"   => s.dns_name,
           "created_at" => s.created_at,
         }
