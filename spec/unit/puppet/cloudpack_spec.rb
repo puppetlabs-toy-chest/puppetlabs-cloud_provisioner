@@ -520,10 +520,10 @@ Puppet::Network::HttpPool.http_instance('puppet', 3000)
         merged_options = subject.merge_default_options(@options)
         merged_options.should include(:install_script)
       end
-      it 'should set the installer script to gems when unset' do
+      it 'should set the installer script to puppet-community when unset' do
         (opts = @options.dup).delete(:install_script)
         merged_options = subject.merge_default_options(opts)
-        merged_options[:install_script].should eq('gems')
+        merged_options[:install_script].should eq('puppet-community')
       end
       it 'should allow the user to specify the install script' do
         merged_options = subject.merge_default_options(@options)
