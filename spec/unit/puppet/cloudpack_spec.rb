@@ -231,7 +231,7 @@ describe Puppet::CloudPack do
         @is_command_valid = false
         @has_keyfile = true
         Puppet::CloudPack.expects(:ssh_remote_execute).times(3).with do |server, login, command, keyfile|
-          if command =~ /^sudo bash -c 'chmod u\+x \S+gems\.sh; \S+gems\.sh'/
+          if command =~ /^sudo bash -c 'chmod u\+x \S+puppet-community\.sh; \S+puppet-community\.sh'/
             # set that the command is valid when it matches the regex
             # the test will pass is this is set to true
             @is_command_valid = true
@@ -248,7 +248,7 @@ describe Puppet::CloudPack do
         Puppet::CloudPack.expects(:ssh_connect).with(@server, 'root', @keyfile.path).returns(@mock_connection_tuple)
         @is_command_valid = false
         Puppet::CloudPack.expects(:ssh_remote_execute).times(3).with do |server, login, command, keyfile|
-          if command =~ /^bash -c 'chmod u\+x \S+gems\.sh; \S+gems\.sh'/
+          if command =~ /^bash -c 'chmod u\+x \S+puppet-community\.sh; \S+puppet-community\.sh'/
             # set that the command is valid when it matches the regex
             # the test will pass is this is set to true
             @is_command_valid = true
