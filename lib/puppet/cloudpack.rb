@@ -450,14 +450,17 @@ module Puppet::CloudPack
           response = http.post("/memberships.json", data.to_pson, headers)
           handle_json_response(response, 'Classify node', '201')
         end
-      rescue Errno::ECONNREFUSED
+      rescue Errno::ECONNREFUSED => e
         Puppet.warning 'Registering node ... Error'
-        Puppet.err "Could not connect to host http://#{options[:enc_server]}:#{options[:enc_port]}"
-        Puppet.err "Check your --enc_server and --enc_port options"
-        exit(1)
+        Puppet.err "Could not connect to host #{options[:enc_server]} on port #{options[:enc_port]}"
+        Puppet.err "This could be because a local host firewall is blocking the connection"
+        Puppet.err "Please check your --enc-server and --enc-port options"
+        ex = Puppet::Error.new(e)
+        ex.set_backtrace(e.backtrace)
+        raise ex
       end
 
-      return nil
+      return { 'status' => 'complete' }
     end
 
     def handle_json_response(response, action, expected_code='200')
