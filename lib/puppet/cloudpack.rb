@@ -343,6 +343,15 @@ module Puppet::CloudPack
     end
 
     def add_classify_options(action)
+      action.option '--enc-ssl' do
+        summary 'Whether to use SSL when connecting to the ENC'
+        description <<-'EOT'
+          By default, we do not connect to the ENC over SSL.  This options
+          specifies all HTTP connections to the ENC to go over SSL in order to
+          provide encryption.
+        EOT
+      end
+
       action.option '--enc-server=' do
         summary 'The External Node Classifier URL.'
         description <<-EOT
@@ -387,11 +396,22 @@ module Puppet::CloudPack
     end
 
     def dashboard_classify(certname, options)
-      Puppet.info "Using http://#{options[:enc_server]}:#{options[:enc_port]} as Dashboard."
       http = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
 
-      # Workaround for the fact that Dashboard is typically insecure.
-      http.use_ssl = false
+      # This is the --enc-ssl boolean command line option
+      # Note, this does not result in a post-validation check
+      # of the SSL connection.  We only get encryption and no
+      # validation of the socket.
+      if options[:enc_ssl] then
+        http.use_ssl = true
+        uri_scheme = 'https'
+      else
+        http.use_ssl = false
+        uri_scheme = 'http'
+      end
+
+      Puppet.info "Using #{uri_scheme}://#{options[:enc_server]}:#{options[:enc_port]}/ to classify #{certname}"
+
       headers = { 'Content-Type' => 'application/json' }
 
       begin
