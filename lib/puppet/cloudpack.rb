@@ -353,11 +353,10 @@ module Puppet::CloudPack
       end
 
       action.option '--enc-server=' do
-        summary 'The External Node Classifier URL.'
+        summary 'The External Node Classifier hostname'
         description <<-EOT
-          The URL of the External Node Classifier.
-          This currently only supports the Dashboard
-          as an external node classifier.
+          The hostname of the External Node Classifier.  This currently only
+          supports the Dashboard as an external node classifier.
         EOT
         default_to do
           Puppet[:server]
@@ -367,9 +366,8 @@ module Puppet::CloudPack
       action.option '--enc-port=' do
         summary 'The External Node Classifier Port'
         description <<-EOT
-          The port of the External Node Classifier.
-          This currently only supports the Dashboard
-          as an external node classifier.
+          The port of the External Node Classifier.  This currently only
+          supports the Dashboard as an external node classifier.
         EOT
         default_to do
           3000
@@ -377,7 +375,7 @@ module Puppet::CloudPack
       end
 
       action.option '--node-group=', '--as=' do
-        summary 'The Puppet Dashboard node group to add to.'
+        summary 'The Puppet Dashboard node group to add the node to.'
       end
     end
 
