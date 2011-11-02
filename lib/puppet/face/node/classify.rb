@@ -2,18 +2,30 @@ require 'puppet/cloudpack'
 
 Puppet::Face.define :node, '0.0.1' do
   action :classify do
-    summary 'Specify how Puppet should classify a node'
+    summary 'Add a node to a dashboard group'
     description <<-EOT
       Make The External Node Classifier aware of a newly created agent
-      and classify it. This only supports the Dashboard as a
-      node classifier and assigns node groups in order to classify.
+      and classify it. This only supports the Dashboard as a node classifier
+      and assigns the node to a group.  The group itself is expected to have
+      classes the node should receive in its configuration catalog
 
-      Classification of a node will allow it to receive proper
-      configurations on its next run
+      Classification of a node will allow it to receive proper configurations
+      on its next run
 
-      This action is not restricted to cloud machine instances.
-      It can be run multiple times for a single node.
+      This action is not restricted to cloud machine instances.  It can be run
+      multiple times for a single node.
+
+      This action may also be carried out before the install action.
     EOT
+    examples <<-'EOEXAMPLE'
+      puppet node classify \
+        --enc-server puppetmaster.puppetlabs.lan \
+        --enc-port 3000 \
+        --enc-ssl \
+        --node-group pe_agents \
+        agent01.puppetlabs.lan
+    EOEXAMPLE
+
     Puppet::CloudPack.add_classify_options(self)
     when_invoked do |certname, options|
       Puppet::CloudPack.classify(certname, options)

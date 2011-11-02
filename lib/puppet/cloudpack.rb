@@ -343,12 +343,20 @@ module Puppet::CloudPack
     end
 
     def add_classify_options(action)
+      action.option '--enc-ssl' do
+        summary 'Whether to use SSL when connecting to the ENC'
+        description <<-'EOT'
+          By default, we do not connect to the ENC over SSL.  This options
+          specifies all HTTP connections to the ENC to go over SSL in order to
+          provide encryption.
+        EOT
+      end
+
       action.option '--enc-server=' do
-        summary 'The External Node Classifier URL.'
+        summary 'The External Node Classifier hostname'
         description <<-EOT
-          The URL of the External Node Classifier.
-          This currently only supports the Dashboard
-          as an external node classifier.
+          The hostname of the External Node Classifier.  This currently only
+          supports the Dashboard as an external node classifier.
         EOT
         default_to do
           Puppet[:server]
@@ -358,9 +366,8 @@ module Puppet::CloudPack
       action.option '--enc-port=' do
         summary 'The External Node Classifier Port'
         description <<-EOT
-          The port of the External Node Classifier.
-          This currently only supports the Dashboard
-          as an external node classifier.
+          The port of the External Node Classifier.  This currently only
+          supports the Dashboard as an external node classifier.
         EOT
         default_to do
           3000
@@ -368,7 +375,7 @@ module Puppet::CloudPack
       end
 
       action.option '--node-group=', '--as=' do
-        summary 'The Puppet Dashboard node group to add to.'
+        summary 'The Puppet Dashboard node group to add the node to.'
       end
     end
 
@@ -387,11 +394,22 @@ module Puppet::CloudPack
     end
 
     def dashboard_classify(certname, options)
-      Puppet.info "Using http://#{options[:enc_server]}:#{options[:enc_port]} as Dashboard."
       http = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
 
-      # Workaround for the fact that Dashboard is typically insecure.
-      http.use_ssl = false
+      # This is the --enc-ssl boolean command line option
+      # Note, this does not result in a post-validation check
+      # of the SSL connection.  We only get encryption and no
+      # validation of the socket.
+      if options[:enc_ssl] then
+        http.use_ssl = true
+        uri_scheme = 'https'
+      else
+        http.use_ssl = false
+        uri_scheme = 'http'
+      end
+
+      Puppet.info "Using #{uri_scheme}://#{options[:enc_server]}:#{options[:enc_port]}/ to classify #{certname}"
+
       headers = { 'Content-Type' => 'application/json' }
 
       begin
@@ -432,14 +450,17 @@ module Puppet::CloudPack
           response = http.post("/memberships.json", data.to_pson, headers)
           handle_json_response(response, 'Classify node', '201')
         end
-      rescue Errno::ECONNREFUSED
+      rescue Errno::ECONNREFUSED => e
         Puppet.warning 'Registering node ... Error'
-        Puppet.err "Could not connect to host http://#{options[:enc_server]}:#{options[:enc_port]}"
-        Puppet.err "Check your --enc_server and --enc_port options"
-        exit(1)
+        Puppet.err "Could not connect to host #{options[:enc_server]} on port #{options[:enc_port]}"
+        Puppet.err "This could be because a local host firewall is blocking the connection"
+        Puppet.err "Please check your --enc-server and --enc-port options"
+        ex = Puppet::Error.new(e)
+        ex.set_backtrace(e.backtrace)
+        raise ex
       end
 
-      return nil
+      return { 'status' => 'complete' }
     end
 
     def handle_json_response(response, action, expected_code='200')
