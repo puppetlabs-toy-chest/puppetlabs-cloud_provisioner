@@ -26,6 +26,13 @@ describe Puppet::Face[:node, :current] do
         Puppet::CloudPack.expects(:dashboard_classify).with('server', expected_options).once
         subject.classify('server', options)
       end
+
+      it 'should accept the --enc-ssl option' do
+        options[:enc_ssl] = true
+        expected_options.merge!(options)
+        Puppet::CloudPack.expects(:dashboard_classify).with('agent_cn', expected_options).once
+        subject.classify('agent_cn', options)
+      end
     end
   end
 end
