@@ -26,6 +26,10 @@ Puppet::Face.define :node, '0.0.1' do
         agent01.puppetlabs.lan
     EOEXAMPLE
 
+    when_rendering :console do |return_value|
+      return_value['status'] || 'OK'
+    end
+
     Puppet::CloudPack.add_classify_options(self)
     when_invoked do |certname, options|
       Puppet::CloudPack.classify(certname, options)

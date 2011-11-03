@@ -369,13 +369,47 @@ module Puppet::CloudPack
           The port of the External Node Classifier.  This currently only
           supports the Dashboard as an external node classifier.
         EOT
-        default_to do
-          3000
-        end
+        default_to do 3000 end
+      end
+
+      action.option '--enc-auth-user=' do
+        summary 'User name for authentication to ENC'
+        description <<-EOT
+          The Puppet Dashboard can be secured using HTTP authentication.  If
+          the dashboard is configured with HTTP authentication use this option
+          to supply the credentials to authenticate the request.
+
+          Note, this option will default to the PUPPET_ENC_AUTH_USER
+          environment variable.  Please use this environment variable if you
+          are concerned about usernames and passwords being exposed via the
+          Unix process table.
+        EOT
+        default_to do ENV['PUPPET_ENC_AUTH_USER'] end
+      end
+
+      action.option '--enc-auth-passwd=' do
+        summary 'Password for authentication to ENC'
+        description <<-EOT
+          The Puppet Dashboard can be secured using HTTP authentication.  If
+          the dashboard is configured with HTTP authentication use this option
+          to supply the credentials to authenticate the request.
+
+          Note, this option will default to the PUPPET_ENC_AUTH_PASSWD
+          environment variable.  Please use this environment variable if you
+          are concerned about usernames and passwords being exposed via the
+          Unix process table.
+        EOT
+        default_to do ENV['PUPPET_ENC_AUTH_PASSWD'] end
       end
 
       action.option '--node-group=', '--as=' do
-        summary 'The Puppet Dashboard node group to add the node to.'
+        summary 'The Puppet Dashboard node group to associate the node with'
+        description <<-'EOT'
+          Use the --node-group option to specify the group to associate the
+          node with.  The group must already exist in the Dashboard or an error
+          will be returned.  If the node has not been registered it will
+          automatically be registered for you.
+        EOT
       end
     end
 
@@ -394,70 +428,53 @@ module Puppet::CloudPack
     end
 
     def dashboard_classify(certname, options)
+      # The Net::HTTP client instance
       http = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
 
-      # This is the --enc-ssl boolean command line option
-      # Note, this does not result in a post-validation check
-      # of the SSL connection.  We only get encryption and no
-      # validation of the socket.
       if options[:enc_ssl] then
         http.use_ssl = true
         uri_scheme = 'https'
+        # We intentionally use SSL only for encryption and not authenticity checking
+        http.verify_mode = OpenSSL::SSL::VERIFY_NONE
       else
         http.use_ssl = false
         uri_scheme = 'http'
       end
 
-      Puppet.info "Using #{uri_scheme}://#{options[:enc_server]}:#{options[:enc_port]}/ to classify #{certname}"
+      Puppet.notice "Contacting #{uri_scheme}://#{options[:enc_server]}:#{options[:enc_port]}/ to classify #{certname}"
 
-      headers = { 'Content-Type' => 'application/json' }
+      # This block create the node and returns it to the caller
+      notfound_register_the_node = lambda do
+        data = { 'node' => { 'name' => certname } }
+        http_request(http, '/nodes.json', options, 'Register Node', '201', data)
+      end
+      # Get a list of nodes to check if we need to create the node or not
+      nodes = http_request(http, '/nodes.json', options, 'List nodes')
+      # Find an existing node or register the node using the lambda block
+      node = nodes.find(notfound_register_the_node) do |node|
+        node['name'] == certname
+      end
+      node_id = node['id']
 
-      begin
-        Puppet.notice "Registering node: #{certname} ..."
-        # get the list of nodes that have been specified in the Dashboard
-        response = http.get('/nodes.json', headers )
-        nodes = handle_json_response(response, 'List nodes')
-        node = nodes.detect { |node| node['name'] == certname }
-        node_info = if node
-          Puppet.notice("Node: #{certname} already exists in Dashboard, not creating")
-          node
-        else
-          # create the node if it does not exist
-          data = { 'node' => { 'name' => certname } }
-          response = http.post('/nodes.json', data.to_pson, headers)
-          handle_json_response(response, 'Registering node', '201')
-        end
-        node_id = node_info['id']
+      # checking if the specified group even exists
+      notfound_group_dne_error = lambda do
+        raise Puppet::Error, "Group #{options[:node_group]} does not exist in Dashboard. Groups must exist before they can be assigned to nodes."
+      end
+      node_groups = http_request(http, '/node_groups.json', options, 'List Groups')
+      node_group_info = node_groups.find(notfound_group_dne_error) do |group|
+        group['name'] == options[:node_group]
+      end
+      node_group_id = node_group_info['id']
 
-        # checking if the specified group even exists
-        response = http.get('/node_groups.json', headers )
-        node_groups = handle_json_response(response, 'List groups')
+      # Finally add the node to the group.
+      notfound_associate_node = lambda do
+        data = { 'node_name' => certname, 'group_name' => options[:node_group] }
+        http_request(http, '/memberships.json', options, 'Classify node', '201', data)
+      end
 
-        node_group_info = node_groups.detect {|group| group['name'] == options[:node_group] }
-        unless node_group_info
-          raise Puppet::Error, "Group #{options[:node_group]} does not exist in Dashboard. Groups must exist before they can be assigned to nodes."
-        end
-        node_group_id = node_group_info['id']
-
-        Puppet.notice 'Classifying node ...'
-        response = http.get("/memberships.json", headers)
-        memberships = handle_json_response(response, 'List memberships')
-        if memberships.detect{ |members| members['node_group_id'] == node_group_id and members['node_id'] == node_id }
-          Puppet.warning("Group #{options[:node_group]} already added to node #{options[:node_name]}, nothing to do")
-        else
-          # add the node group to the node if the relationship did not already exist
-          data = { 'node_name' => certname, 'group_name' => options[:node_group] }
-          response = http.post("/memberships.json", data.to_pson, headers)
-          handle_json_response(response, 'Classify node', '201')
-        end
-      rescue Errno::ECONNREFUSED => e
-        Puppet.warning 'Registering node ... Error'
-        Puppet.err "Could not connect to host #{options[:enc_server]} on port #{options[:enc_port]}"
-        Puppet.err "This could be because a local host firewall is blocking the connection"
-        Puppet.err "Please check your --enc-server and --enc-port options"
-        ex = Puppet::Error.new(e)
-        ex.set_backtrace(e.backtrace)
-        raise ex
+      memberships = http_request(http, '/memberships.json', options, 'List group members')
+      response = memberships.find(notfound_associate_node) do |members|
+        members['node_group_id'] == node_group_id and members['node_id'] == node_id
       end
 
       return { 'status' => 'complete' }
@@ -465,13 +482,19 @@ module Puppet::CloudPack
 
     def handle_json_response(response, action, expected_code='200')
       if response.code == expected_code
-        Puppet.notice "#{action} ... Done"
+        Puppet.info "#{action} ... Done"
         PSON.parse response.body
       else
         # I should probably raise an exception!
         Puppet.warning "#{action} ... Failed"
         Puppet.info("Body: #{response.body}")
         Puppet.warning "Server responded with a #{response.code} status"
+        case response.code
+        when /401/
+          Puppet.notice "A 401 response is the HTTP code for an Unauthorized request"
+          Puppet.notice "This error likely means you need to supply the --enc-auth-user and --enc-auth-passwd options"
+          Puppet.notice "Alternatively set PUPPET_ENC_AUTH_PASSWD environment variable for increased security"
+        end
         raise Puppet::Error, "Could not: #{action}, got #{response.code} expected #{expected_code}"
       end
     end
@@ -910,6 +933,35 @@ module Puppet::CloudPack
         # assuming that everything else is a valid filepath
         :file_path
       end
+    end
+
+    # Method to make generic, SSL, Authenticated HTTP requests
+    # and parse the JSON response.  Primarily for #10377 and #10197
+    def http_request(http, path, options = {}, action = nil, expected_code = '200', data = nil)
+      action ||= path
+      # We need to POST data, otherwise we'll use GET
+      request = data ? Net::HTTP::Post.new(path) : Net::HTTP::Get.new(path)
+      # Set the form data
+      request.body = data.to_pson if data
+      # Authentication information
+      request.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) if ! options[:enc_auth_user].nil?
+      # Content Type of the request
+      request.set_content_type('application/json')
+
+      # Wrap the request in an exception handler
+      begin
+        response = http.start { |http| http.request(request) }
+      rescue Errno::ECONNREFUSED => e
+        Puppet.warning 'Registering node ... Error'
+        Puppet.err "Could not connect to host #{options[:enc_server]} on port #{options[:enc_port]}"
+        Puppet.err "This could be because a local host firewall is blocking the connection"
+        Puppet.err "Please check your --enc-server and --enc-port options"
+        ex = Puppet::Error.new(e)
+        ex.set_backtrace(e.backtrace)
+        raise ex
+      end
+      # Return the parsed JSON response
+      handle_json_response(response, action, expected_code)
     end
   end
 end
