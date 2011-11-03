@@ -10,9 +10,11 @@ describe Puppet::Face[:node, :current] do
     let(:expected_options) do
       {
         :node_group => 'webserver',
-        :extra      => {},
+        :extra => {},
         :enc_server => 'puppet',
-        :enc_port   => 3000,
+        :enc_port => 3000,
+        :enc_auth_user => nil,
+        :enc_auth_passwd => nil,
       }
     end
 
