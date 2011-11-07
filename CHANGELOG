@@ -1,3 +1,29 @@
+Mon Nov 07 2011 Michael Stahnke <stahnma@puppetlabs.com> - v1.0.0
+(#10197) Add HTTP authentication to classify action
+(#10377) Fix backtrace in classify when connection refused
+(maint) Update doc strings for classify action
+(#10377) Add spec test for --enc-ssl option
+(#10377) Change classify spec to use let memos
+(#10377) Add --enc-ssl option and https support to classify action
+(#10184) Fix 2 failing specs for CP installer method
+(#8676) Catch the Errno::EHOSTUNREACH exception and retry
+(#10184) Fixing failing spec test
+(#10184) Adding a new puppet-community install script
+(#10181) Default puppetagent-certname to random guid plus node dns name
+(#10206) Use exception class as key
+(#10172) Use the Puppet::CloudProvisioner::Utils#retry_action method
+(#10178) Use the Puppet::CloudPack::Utils#retry_action method
+(#10171) Refactor the `retry_action` + unit tests
+Adding a new `retry_action` method
+(#10042) Add enc-server/enc-port optoins
+(#10057) Fix failing unit tests
+(#10057) Pass keyfile to the ssh_remote_execute
+(#10061) Test correct certname is used in bootstrap action
+(#10062) Fix certificate signing
+(#10061) Fix certname used for classification by bootstrap
+(#10059) Handle nodes post to dashboard response
+Adding Rakefile to create release tarballs
+
 Mon Oct 10 2011 Michael Stahnke <stahnma@puppetlabs.com> - v0.6.0rc2
 * Fill in license template
 * (#9805) Ensure tempfiles do not get garbage collected

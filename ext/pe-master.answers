@@ -22,3 +22,4 @@ q_puppetmaster_enterpriseconsole_port=443
 q_puppetmaster_forward_facts=n
 q_puppetmaster_install=y
 q_vendor_packages_install=y
+q_install=y
