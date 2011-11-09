@@ -4,10 +4,11 @@ Puppet::Face.define :node, '0.0.1' do
   action :classify do
     summary 'Add a node to a dashboard group'
     description <<-EOT
-      Make The External Node Classifier aware of a newly created agent
-      and classify it. This only supports the Dashboard as a node classifier
-      and assigns the node to a group.  The group itself is expected to have
-      classes the node should receive in its configuration catalog
+      Add node <certname> to a dashboard group.  Make The External Node
+      Classifier aware of a newly created agent and classify it. This only
+      supports the Dashboard as a node classifier and assigns the node to a
+      group.  The group itself is expected to have classes the node should
+      receive in its configuration catalog
 
       Classification of a node will allow it to receive proper configurations
       on its next run
@@ -25,6 +26,8 @@ Puppet::Face.define :node, '0.0.1' do
         --node-group pe_agents \
         agent01.puppetlabs.lan
     EOEXAMPLE
+
+    arguments '<certname>'
 
     when_rendering :console do |return_value|
       return_value['status'] || 'OK'
