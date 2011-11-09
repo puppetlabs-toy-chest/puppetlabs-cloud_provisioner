@@ -14,6 +14,9 @@ fingerprint.  If one is found, the fingerprint is returned otherwise a warning
 is displayed.  In either case, if this command returns without an error then
 the system is ready for use.
     EOT
+
+    arguments '<instance name>'
+
     Puppet::CloudPack.add_fingerprint_options(self)
     when_invoked do |server, options|
       Puppet::CloudPack.fingerprint(server, options)
