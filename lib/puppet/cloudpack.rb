@@ -20,8 +20,8 @@ module Puppet::CloudPack
       default_options.merge(options)
     end
     def add_availability_zone_option(action)
-      action.option '--availability_zone=' do
-        summary 'Type of instance.'
+      action.option '--availability-zone=' do
+        summary 'AWS availability zone.'
         description <<-EOT
           Specifies the availability zone into which the VM will be created
         EOT
