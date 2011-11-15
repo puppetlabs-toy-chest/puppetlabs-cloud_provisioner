@@ -78,12 +78,13 @@ describe Puppet::Face[:node_aws, :current] do
           /unrecognized.*: #{@options[:keyname]}/i
       end
     end
-    describe '(availability_zone)' do 
-      it "should validate the availability zone"
-        @options[:availability_zone]= 'test-puppet-zone'
+    describe '(availability_zone)' do
+      it "should validate the availability zone" do
+        @options[:availability_zone] = 'test-puppet-zone'
         expect { subject.create(@options) }.to raise_error ArgumentError, /Invalid availability zone/
       end
     end
+
     describe '(region)' do
       it "should set the region to us-east-1 if no region is supplied" do
         @options.delete(:region)
