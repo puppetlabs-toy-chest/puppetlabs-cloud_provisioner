@@ -1,3 +1,5 @@
 :default:
   :aws_access_key_id: dummy
   :aws_secret_access_key: dummy
+  :rackspace_api_key: dummy
+  :rackspace_username: dummy
