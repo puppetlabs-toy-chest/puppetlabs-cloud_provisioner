@@ -186,6 +186,37 @@ module Puppet::CloudPack
     end
 
     def add_install_options(action)
+      action.option '--facts=' do
+        summary 'Set custom facts in format of fact1=value,fact2=value'
+        description <<-'EOT'
+          To install custom facts during install of a node, use the format
+          fact1=value,fact2=value. Currently, there is no way to escape 
+          the ',' character so facts cannot contain this character.
+
+          Requirements:
+          For community installs of puppet, i.e. not Puppet Enterprise,
+          the Puppet Labs' `stdlib` module will be required. It can be found
+          at 'http://forge.puppetlabs.com/puppetlabs/stdlib' or installed
+          with the command 'puppet-module install puppetlabs/stdlib'.
+
+          For Puppet Enterprise installs, there are no extra requirements
+          for this option to work
+        EOT
+
+        before_action do |action, arguments, options|
+          ## This converts 'this=that,foo=bar,biz=baz=also' to
+          ## { 'this' => 'that', 'foo' => 'barr', 'biz' => 'baz=also'}
+          ##
+          ## A regex is needed that will allow us to escape ',' characters
+          ## from the CLI
+          begin
+            options[:facts] = Hash[ options[:facts].split(',').map { |fact| fact.split('=',2) } ]
+          rescue
+            raise ArgumentError, 'Could not parse facts given. Please check your format'
+          end
+        end
+      end
+
       action.option '--login=', '-l=', '--username=' do
         summary 'User to login to the instance as.'
         description <<-EOT

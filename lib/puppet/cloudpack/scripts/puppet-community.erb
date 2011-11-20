@@ -87,6 +87,21 @@ function start_puppet() {
   /etc/init.d/puppet start
 }
 
+#This fuction is not called if no custom facts are given
+#
+#The Puppet Labs' stdlib module is required for this to work
+#It can be installed using: 
+# 'puppet-module install puppetlabs/stdlib'
+function facts_dot_d() {
+  mkdir -p /etc/facter/facts.d
+  <% if options[:facts] %>
+  echo "Installing custom facts"
+  <% options[:facts].each do |fact,value| %>
+  echo <%= fact %>=<%= value %> > /etc/facter/facts.d/<%= fact %>.txt
+  <% end %>
+  <% end %>
+}
+
 function provision_puppet() {
   if [ -f /etc/redhat-release ]; then
     export breed='redhat'
@@ -99,6 +114,7 @@ function provision_puppet() {
   
   install_puppet
   configure_puppet
+  <%= 'facts_dot_d' if options[:facts] %>
   start_puppet
   echo "Puppet installation finished!"
   exit 0
