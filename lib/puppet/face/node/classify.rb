@@ -2,21 +2,19 @@ require 'puppet/cloudpack'
 
 Puppet::Face.define :node, '0.0.1' do
   action :classify do
-    summary 'Add a node to a dashboard group'
+    summary 'Add a node to a console or Dashboard group.'
     description <<-EOT
-      Add node <certname> to a dashboard group.  Make The External Node
-      Classifier aware of a newly created agent and classify it. This only
-      supports the Dashboard as a node classifier and assigns the node to a
-      group.  The group itself is expected to have classes the node should
-      receive in its configuration catalog
+      Add node <certname> to a group in Puppet Dashboard, Puppet Enterprise's
+      console, or any external node classifier that provides a similar API.
 
       Classification of a node will allow it to receive proper configurations
-      on its next run
+      on its next Puppet run. This action assumes that you have already
+      created a console or Dashboard group with the classes the node should
+      receive in its configuration catalog.
 
-      This action is not restricted to cloud machine instances.  It can be run
-      multiple times for a single node.
-
-      This action may also be carried out before the install action.
+      This action can be used on both physical and virtual machines, and can
+      be run multiple times for a single node. This action can be safely run
+      before the `install` action.
     EOT
     examples <<-'EOEXAMPLE'
       Add the agent01.example.com node to the pe_agents group:

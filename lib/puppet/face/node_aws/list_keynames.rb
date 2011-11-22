@@ -4,14 +4,12 @@ require 'puppet/cloudpack'
 Puppet::Face.define :node_aws, '0.0.1' do
   action :list_keynames do
 
-    summary 'List available AWS EC2 key names'
-
-    arguments 'NONE'
+    summary 'List available AWS EC2 key names.'
 
     description <<-'EOT'
       This action lists the available AWS EC2 key names and their fingerprints.
-      This is helpful to determine your options when supplying the --keyname option
-      to the create action.
+      Any key name from this list is a valid argument for the create action's
+      --keyname option.
     EOT
 
     Puppet::CloudPack.add_list_keynames_options(self)
@@ -26,7 +24,7 @@ Puppet::Face.define :node_aws, '0.0.1' do
       end.sort.join("\n")
     end
 
-    returns 'Array of attribute hashes containing information about each Key Pair'
+    returns 'Array of attribute hashes containing information about each key pair'
 
     examples <<-'EOT'
       List the available key pairs:

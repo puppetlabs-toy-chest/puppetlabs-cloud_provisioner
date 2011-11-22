@@ -3,7 +3,7 @@ require 'puppet/face/node_aws'
 
 Puppet::Face.define :node_aws, '0.0.1' do
   action :terminate do
-    summary 'Terminate an EC2 machine instance'
+    summary 'Terminate an EC2 machine instance.'
     description <<-EOT
       Terminate the instance identified by <instance_name>.
     EOT

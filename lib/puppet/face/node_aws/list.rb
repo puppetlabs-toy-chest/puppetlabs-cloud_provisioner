@@ -4,12 +4,10 @@ require 'puppet/face/node_aws'
 Puppet::Face.define :node_aws, '0.0.1' do
   action :list do
 
-    summary 'List AWS EC2 node instances'
-
-    arguments 'NONE'
+    summary 'List AWS EC2 machine instances.'
 
     description <<-'EOT'
-      The list action obtains a list of instances from the cloud provider and
+      This action obtains a list of instances from the cloud provider and
       displays them on the console output.  For EC2 instances, only the instances in
       a specific region are provided.
     EOT
