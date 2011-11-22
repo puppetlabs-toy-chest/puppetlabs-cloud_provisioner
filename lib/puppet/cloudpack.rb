@@ -770,7 +770,7 @@ module Puppet::CloudPack
           end
         end
       rescue Net::SSH::AuthenticationFailed => user
-        raise Puppet::Error, "Authentication failure for user #{user}. Please check the keyfile and try again."
+        raise Net::SSH::AuthenticationFailed, "Authentication failure for user #{user}. Please check the keyfile and try again."
       end
 
       Puppet.info "Executing remote command ... Done"
