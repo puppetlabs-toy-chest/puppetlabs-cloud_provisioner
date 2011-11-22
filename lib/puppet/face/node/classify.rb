@@ -19,12 +19,14 @@ Puppet::Face.define :node, '0.0.1' do
       This action may also be carried out before the install action.
     EOT
     examples <<-'EOEXAMPLE'
-      puppet node classify \
-        --enc-server puppetmaster.puppetlabs.lan \
-        --enc-port 3000 \
-        --enc-ssl \
-        --node-group pe_agents \
-        agent01.puppetlabs.lan
+      Add the agent01.example.com node to the pe_agents group:
+
+          puppet node classify \
+            --enc-server puppetmaster.example.com \
+            --enc-port 3000 \
+            --enc-ssl \
+            --node-group pe_agents \
+            agent01.example.com
     EOEXAMPLE
 
     arguments '<certname>'

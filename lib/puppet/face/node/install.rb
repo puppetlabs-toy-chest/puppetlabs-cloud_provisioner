@@ -4,12 +4,12 @@ Puppet::Face.define :node, '0.0.1' do
   action :install do
     summary 'Install Puppet on a running node'
     description <<-EOT
-      Installs Puppet on an existing node at <hostname or ip>. It uses scp to
-      copy installation requirements to the machine and ssh to run the
+      Installs Puppet on an existing node at <hostname_or_ip>. It uses scp to
+      copy installation requirements to the machine, and ssh to run the
       installation commmands remotely.
     EOT
 
-    arguments '<hostname or ip>'
+    arguments '<hostname_or_ip>'
 
     Puppet::CloudPack.add_install_options(self)
     when_rendering :console do |return_value|

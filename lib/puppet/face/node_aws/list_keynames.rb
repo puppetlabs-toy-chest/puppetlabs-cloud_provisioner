@@ -29,15 +29,19 @@ Puppet::Face.define :node_aws, '0.0.1' do
     returns 'Array of attribute hashes containing information about each Key Pair'
 
     examples <<-'EOT'
-      $ puppet node_aws list_keynames
-      cody (58:c6:4f:3e:b5:51:e0:ec:49:55:4e:98:43:8f:28:f3:9a:14:c8:a3)
-      jeff (6e:b6:0a:27:5b:67:cd:8b:47:74:9c:f7:b2:b0:b9:ab:3a:25:d0:28)
-      matt (4b:8c:8d:a9:e5:88:6a:47:b7:8b:97:c5:77:e7:b7:6f:fd:b9:64:b3)
+      List the available key pairs:
 
-      $ puppet node_aws list_keynames --render-as json
-      [{"name":"cody","fingerprint":"58:c6:4f:3e:b5:51:e0:ec:49:55:4e:98:43:8f:28:f3:9a:14:c8:a3"},
-       {"name":"jeff","fingerprint":"6e:b6:0a:27:5b:67:cd:8b:47:74:9c:f7:b2:b0:b9:ab:3a:25:d0:28"},
-       {"name":"matt","fingerprint":"4b:8c:8d:a9:e5:88:6a:47:b7:8b:97:c5:77:e7:b7:6f:fd:b9:64:b3"}]
+          $ puppet node_aws list_keynames
+          cody (58:c6:4f:3e:b5:51:e0:ec:49:55:4e:98:43:8f:28:f3:9a:14:c8:a3)
+          jeff (6e:b6:0a:27:5b:67:cd:8b:47:74:9c:f7:b2:b0:b9:ab:3a:25:d0:28)
+          matt (4b:8c:8d:a9:e5:88:6a:47:b7:8b:97:c5:77:e7:b7:6f:fd:b9:64:b3)
+
+      Get the key pair list as an array of JSON hashes:
+
+          $ puppet node_aws list_keynames --render-as json
+          [{"name":"cody","fingerprint":"58:c6:4f:3e:b5:51:e0:ec:49:55:4e:98:43:8f:28:f3:9a:14:c8:a3"},
+           {"name":"jeff","fingerprint":"6e:b6:0a:27:5b:67:cd:8b:47:74:9c:f7:b2:b0:b9:ab:3a:25:d0:28"},
+           {"name":"matt","fingerprint":"4b:8c:8d:a9:e5:88:6a:47:b7:8b:97:c5:77:e7:b7:6f:fd:b9:64:b3"}]
     EOT
 
   end
