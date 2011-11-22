@@ -49,7 +49,20 @@ module Puppet::CloudPack
       end
     end
 
+    def add_credential_option(action)
+      action.option '--credentials=' do
+        summary 'Cloud credentials to use from ~/.fog'
+        description <<-EOT
+          For accessing more than a single account, auxiliary credentials other
+          than 'default' may be supplied in the credentials location (usually
+          ~/.fog).
+        EOT
+      end
+    end
+
     def add_platform_option(action)
+      add_credential_option(action)
+
       action.option '--platform=' do
         summary 'Platform used to create machine instance (only supports AWS).'
         description <<-EOT
@@ -894,6 +907,7 @@ module Puppet::CloudPack
       # that pass in a provider string that does not match 'AWS'.  This makes
       # the test pass by preventing Fog from throwing an error when the region
       # option is not expected
+      Fog.credential = options[:credentials].to_sym if options[:credentials]
       case options[:platform]
       when 'AWS'
         Fog::Compute.new(:provider => options[:platform], :region => options[:region])
