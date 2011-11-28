@@ -84,9 +84,9 @@ module Puppet::CloudPack
       action.option '--image=', '-i=' do
         summary 'AMI to use when creating the instance.'
         description <<-EOT
-          Pre-configured operating system image used to create machine instance.
-          This currently only supports AMI images.
-          Example of a Redhat 5.6 32bit image: ami-b241bfdb
+          The pre-configured operating system image to use when creating this
+          machine instance. Currently, only AMI images are supported. Example
+          of a Redhat 5.6 32bit image: ami-b241bfdb
         EOT
         required
         before_action do |action, args, options|
@@ -102,8 +102,8 @@ module Puppet::CloudPack
       action.option '--type=' do
         summary 'Type of instance.'
         description <<-EOT
-          Type of instance to be launched. Type specifies characteristics that
-          a machine will have such as architecture, memory, processing power, storage
+          Type of instance to be launched. The type specifies characteristics that
+          a machine will have, such as architecture, memory, processing power, storage,
           and IO performance. The type selected will determine the cost of a machine instance.
           Supported types are: 'm1.small','m1.large','m1.xlarge','t1.micro','m2.xlarge',
           'm2.2xlarge','x2.4xlarge','c1.medium','c1.xlarge','cc1.4xlarge'.
@@ -112,20 +112,22 @@ module Puppet::CloudPack
         before_action do |action, args, options|
           supported_types = ['m1.small','m1.large','m1.xlarge','t1.micro','m2.xlarge','m2.2xlarge','x2.4xlarge','c1.medium','c1.xlarge','cc1.4xlarge']
           unless supported_types.include?(options[:type])
-            raise ArgumentError, "Platform must be one of the following: #{supported_types.join(', ')}"
+            raise ArgumentError, "Type must be one of the following: #{supported_types.join(', ')}"
           end
         end
       end
 
       action.option '--keyname=' do
-        summary 'The AWS SSH key name as shown in the AWS console.  Please see the related list_keynames action.'
+        summary 'The AWS SSH key name as shown in the AWS console. See the list_keynames action.'
         description <<-EOT
-          This options expects the name of the SSH key pair as listed in the
-          Amazon AWS console.  Cloud Provisioner will use this information to tell Amazon
-          to install the public SSH key into the authorized_keys file of the new EC2
-          instance.  This is a related, but distinct, option from the --keyfile option of
-          the install action.  To obtain a listing of valid keynames please see the
-          list_keynames action.
+          The name of the SSH key pair to use, as listed in the Amazon AWS
+          console.  When creating the instance, Amazon will install the
+          requested SSH public key into the instance's authorized_keys file.
+          Not to be confused with the --keyfile option of the `node`
+          subcommand's `install` action.
+
+          You can use the `list_keynames` action to get a list of valid key
+          pairs.
         EOT
         required
         before_action do |action, args, options|
@@ -141,10 +143,11 @@ module Puppet::CloudPack
       action.option '--group=', '-g=', '--security-group=' do
         summary "The instance's security group(s)."
         description <<-EOT
-          The security group(s) that the machine will be associated with.
-          A security group determines the rules for both inbound as well as
-          outbound connections.
-          Multiple groups can be specified as a list using ':'.
+          The security group(s) that the machine will be associated with. A
+          security group determines the rules for both inbound and outbound
+          connections.
+
+          Multiple groups can be specified as a colon-separated list.
         EOT
         before_action do |action, args, options|
           Puppet::CloudPack.group_option_before_action(options)
@@ -187,26 +190,27 @@ module Puppet::CloudPack
 
     def add_install_options(action)
       action.option '--login=', '-l=', '--username=' do
-        summary 'User to login to the instance as.'
+        summary 'User to log in to the instance as.'
         description <<-EOT
-          The name of the user to login to the instance as.
-          This should be the same user who has been configured
-          with your key pair for passwordless access.
+          The name of the user Puppet should use when logging in to the node.
+          This user should configured to allow passwordless access via the SSH
+          key supplied in the --keyfile option.
+
           This is usually the root user.
         EOT
         required
       end
 
       action.option '--keyfile=' do
-        summary "The path to the local SSH private key or 'agent' if the private key is loaded in an agent"
+        summary "The path to a local SSH private key (or 'agent' if using an agent)."
         description <<-EOT
-          This option expects the filesystem path to the local private key that
-          can be used to ssh into the instance. If the instance was created with the
-          create action, this should be the path to the private key file downloaded
-          from the Amazon AWS EC2.
+          The filesystem path to a local private key that can be used to SSH
+          into the node. If the node was created with the `node_aws` `create`
+          action, this should be the path to the private key file downloaded
+          from the Amazon EC2 interface.
 
-          Specify 'agent' if you have the key loaded in your agent and available via
-          the SSH_AUTH_SOCK variable.
+          Specify 'agent' if you have the key loaded in ssh-agent and
+          available via the SSH_AUTH_SOCK variable.
         EOT
         required
         before_action do |action, arguments, options|
@@ -218,7 +222,7 @@ module Puppet::CloudPack
             # Check if the user actually has access to an Agent.
             if ! ENV['SSH_AUTH_SOCK'] then
               raise ArgumentError,
-                "SSH_AUTH_SOCK environment variable is not set and you specified --agent keyfile.  Please check that ssh-agent is running correctly, or perhaps SSH agent forwarding is disabled."
+                "SSH_AUTH_SOCK environment variable is not set and you specified --keyfile agent.  Please check that ssh-agent is running correctly, and that SSH agent forwarding is not disabled."
             end
             # We break out of the before action block because we don't really
             # have anything else to do to support ssh agent authentication.
@@ -236,12 +240,12 @@ module Puppet::CloudPack
       end
 
       action.option '--installer-payload=' do
-        summary 'The location of the Puppet Enterprise universal gzipped tarball'
+        summary 'The location of the Puppet Enterprise universal gzipped tarball.'
         description <<-EOT
-          Location of the Puppet enterprise universal tarball to be used
-          for the installation. This option is only required if Puppet
-          should be installed on the machine using this image.
-          This tarball must be zipped.
+          Location of the Puppet enterprise universal tarball to be used for
+          the installation. Can be a local file path or a URL. This option is
+          only required if Puppet should be installed on the machine. The
+          tarball specified must be gzipped.
         EOT
         before_action do |action, arguments, options|
           type = Puppet::CloudPack.payload_type(options[:installer_payload])
@@ -264,7 +268,7 @@ module Puppet::CloudPack
       end
 
       action.option '--installer-answers=' do
-        summary 'Answers file to be used for PE installation'
+        summary 'Answers file to be used for PE installation.'
         description <<-EOT
           Location of the answers file that should be copied to the machine
           to install Puppet Enterprise.
@@ -281,28 +285,28 @@ module Puppet::CloudPack
       end
 
       action.option '--puppetagent-certname=' do
-        summary 'The Puppet Agent certificate name to configure on the target system'
+        summary 'The puppet agent certificate name to configure on the target system.'
         description <<-EOT
-          This option allows you to specify an optional Puppet Agent
+          This option allows you to specify an optional puppet agent
           certificate name to configure on the target system.  This option
           applies to the puppet-enterprise and puppet-enterprise-http
           installation scripts.  If provided, this option will replace any
           puppet agent certificate name provided in the puppet enterprise
-          answers file.  This certificate name will show up in the Puppet Dashboard
-          when the agent checks in for the first time.
+          answers file.  This certificate name will show up in the console (or
+          Puppet Dashboard) when the agent checks in for the first time.
         EOT
       end
 
       action.option '--install-script=' do
-        summary 'Name of the template to use for installation'
+        summary 'The method to use when installing Puppet.'
         description <<-EOT
-          Name of the template to use for installation. The current
+          Name of the installation template to use when installing Puppet. The current
           list of supported templates is: gems, puppet-enterprise
         EOT
       end
 
       action.option '--puppet-version=' do
-        summary 'version of Puppet to install'
+        summary 'Version of Puppet to install.'
         description <<-EOT
           Version of Puppet to be installed. This version is
           passed to the Puppet installer script.
@@ -315,7 +319,7 @@ module Puppet::CloudPack
       end
 
       action.option '--pe-version=' do
-        summary 'version of Puppet Enterprise to install'
+        summary 'Version of Puppet Enterprise to install.'
         description <<-EOT
           Version of Puppet Enterprise to be passed to the installer script.
           Defaults to 1.1.
@@ -328,7 +332,7 @@ module Puppet::CloudPack
       end
 
       action.option '--facter-version=' do
-        summary 'version of facter to install'
+        summary 'Version of facter to install.'
         description <<-EOT
           The version of facter that should be installed.
           This only makes sense in open source installation
@@ -344,19 +348,21 @@ module Puppet::CloudPack
 
     def add_classify_options(action)
       action.option '--enc-ssl' do
-        summary 'Whether to use SSL when connecting to the ENC'
+        summary 'Whether to use SSL when connecting to the ENC.'
         description <<-'EOT'
-          By default, we do not connect to the ENC over SSL.  This options
-          specifies all HTTP connections to the ENC to go over SSL in order to
-          provide encryption.
+          By default, we do not connect to the ENC over SSL.  This option
+          configures all HTTP connections to the ENC to use SSL in order to
+          provide encryption. This option should be set when using Puppet
+          Enterprise 2.0 and higher.
         EOT
       end
 
       action.option '--enc-server=' do
-        summary 'The External Node Classifier hostname'
+        summary 'The external node classifier hostname.'
         description <<-EOT
-          The hostname of the External Node Classifier.  This currently only
-          supports the Dashboard as an external node classifier.
+          The hostname of the external node classifier.  This currently only
+          supports Puppet Enterprise's console and Puppet Dashboard as external
+          node classifiers.
         EOT
         default_to do
           Puppet[:server]
@@ -364,22 +370,23 @@ module Puppet::CloudPack
       end
 
       action.option '--enc-port=' do
-        summary 'The External Node Classifier Port'
+        summary 'The External Node Classifier Port.'
         description <<-EOT
           The port of the External Node Classifier.  This currently only
-          supports the Dashboard as an external node classifier.
+          supports Puppet Enterprise's console and Puppet Dashboard as external
+          node classifiers.
         EOT
         default_to do 3000 end
       end
 
       action.option '--enc-auth-user=' do
-        summary 'User name for authentication to ENC'
+        summary 'User name for authentication to the ENC.'
         description <<-EOT
-          The Puppet Dashboard can be secured using HTTP authentication.  If
-          the dashboard is configured with HTTP authentication use this option
-          to supply the credentials to authenticate the request.
+          PE's console and Puppet Dashboard can be secured using HTTP
+          authentication.  If the console or dashboard is configured with HTTP
+          authentication, use this option to supply credentials for accessing it.
 
-          Note, this option will default to the PUPPET_ENC_AUTH_USER
+          Note: This option will default to the PUPPET_ENC_AUTH_USER
           environment variable.  Please use this environment variable if you
           are concerned about usernames and passwords being exposed via the
           Unix process table.
@@ -388,13 +395,13 @@ module Puppet::CloudPack
       end
 
       action.option '--enc-auth-passwd=' do
-        summary 'Password for authentication to ENC'
+        summary 'Password for authentication to the ENC.'
         description <<-EOT
-          The Puppet Dashboard can be secured using HTTP authentication.  If
-          the dashboard is configured with HTTP authentication use this option
-          to supply the credentials to authenticate the request.
+          PE's console and Puppet Dashboard can be secured using HTTP
+          authentication.  If the console or dashboard is configured with HTTP
+          authentication, use this option to supply credentials for accessing it.
 
-          Note, this option will default to the PUPPET_ENC_AUTH_PASSWD
+          Note: This option will default to the PUPPET_ENC_AUTH_PASSWD
           environment variable.  Please use this environment variable if you
           are concerned about usernames and passwords being exposed via the
           Unix process table.
@@ -403,12 +410,12 @@ module Puppet::CloudPack
       end
 
       action.option '--node-group=', '--as=' do
-        summary 'The Puppet Dashboard node group to associate the node with'
+        summary 'The ENC node group to associate the node with.'
         description <<-'EOT'
-          Use the --node-group option to specify the group to associate the
-          node with.  The group must already exist in the Dashboard or an error
-          will be returned.  If the node has not been registered it will
-          automatically be registered for you.
+          The PE console or Puppet Dashboard group to associate the node with.
+          The group must already exist in the ENC, or an error will be
+          returned.  If the node has not been registered with the ENC, it will
+          automatically be registered when assigning it to a group.
         EOT
       end
     end
@@ -458,7 +465,7 @@ module Puppet::CloudPack
 
       # checking if the specified group even exists
       notfound_group_dne_error = lambda do
-        raise Puppet::Error, "Group #{options[:node_group]} does not exist in Dashboard. Groups must exist before they can be assigned to nodes."
+        raise Puppet::Error, "Group #{options[:node_group]} does not exist in the console/Dashboard. Groups must exist before they can be assigned to nodes."
       end
       node_groups = http_request(http, '/node_groups.json', options, 'List Groups')
       node_group_info = node_groups.find(notfound_group_dne_error) do |group|
