@@ -627,6 +627,14 @@ describe Puppet::CloudPack do
         Fog::Compute.expects(:new).with(:provider => 'SomeProvider')
         subject.send :create_connection, :platform => 'SomeProvider'
       end
+
+      it 'should use auxiliary credentials' do
+        Fog.expects(:credential=).with(:SomeCredential)
+        Fog::Compute.expects(:new).with(:provider => 'SomeProvider')
+        subject.send :create_connection,
+          :platform    => 'SomeProvider',
+          :credentials => 'SomeCredential'
+      end
     end
 
     describe '#create_server' do
