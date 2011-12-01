@@ -764,6 +764,7 @@ module Puppet::CloudPack
       begin
         Net::SSH.start(server, login, ssh_opts) do |session|
           session.open_channel do |channel|
+            channel.request_pty
             channel.on_data do |ch, data|
               buffer << data
               stdout << data
