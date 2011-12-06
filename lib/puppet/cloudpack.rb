@@ -1025,5 +1025,42 @@ module Puppet::CloudPack
       # Return the parsed JSON response
       handle_json_response(response, action, expected_code)
     end
+
+    # Take a block and a timeout and display a progress bar while we're doing our thing
+    def do_in_progress_bar(options = {}, &blk)
+      timeout = options[:timeout].to_i
+      start_time = Time.now
+      abort_time = start_time + timeout
+
+      Puppet.notice "#{options[:notice]} (Started at #{start_time.strftime("%I:%M:%S %p")})"
+      eta_msg = if (timeout <= 120) then
+                  "#{timeout} seconds at #{abort_time.strftime("%I:%M:%S %p")}"
+                else
+                  "#{timeout / 60} minutes at #{abort_time.strftime("%I:%M %p")}"
+                end
+      Puppet.notice "Control will be returned to you in #{eta_msg} if #{options[:message].downcase} is unfinished."
+
+      progress_bar = Puppet::CloudPack::ProgressBar.new(options[:message], timeout)
+      progress_mutex = Mutex.new
+
+      progress_thread = Thread.new do
+        loop do
+          progress = Time.now - start_time
+          progress_mutex.synchronize { progress_bar.set progress }
+          sleep 0.5
+        end
+      end
+
+      block_return_value = nil
+      begin
+        Timeout.timeout(timeout) do
+          block_return_value = blk.call
+        end
+      ensure
+        progress_mutex.synchronize { progress_bar.finish; progress_thread.kill }
+      end
+      end_time = Time.now
+      block_return_value
+    end
   end
 end
