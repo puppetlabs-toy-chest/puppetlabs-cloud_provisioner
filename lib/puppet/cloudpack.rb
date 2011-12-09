@@ -102,6 +102,29 @@ module Puppet::CloudPack
       add_region_option(action)
       add_availability_zone_option(action)
 
+      action.option '--tags=', '-t=' do
+        summary 'The tags the instance should have in format tag1=value1,tag2=value2'
+        description <<-EOT
+          Instances may be tagged with custom tags. The tags should be in the
+          format of tag1=value,tag2=value. Currently there is not way escape
+          the ',' character so tags cannot contain this character.
+        EOT
+
+        before_action do |action, arguments, options|
+          ## This converts 'this=that,foo=bar,biz=baz=also' to
+          ## { 'this' => 'that', 'foo' => 'bar', 'biz' => 'baz=also'}
+          ##
+          ## A regex is needed that will allow us to escape ',' characters
+          ## from the CLI
+          begin
+            options[:tags] = Hash[ options[:tags].split(',').map { |tag| tag.split('=',2) } ]
+          rescue
+            raise ArgumentError, 'Could not parse tags given. Please check your format'
+          end
+        end
+
+      end
+
       action.option '--image=', '-i=' do
         summary 'AMI to use when creating the instance.'
         description <<-EOT
@@ -589,7 +612,12 @@ module Puppet::CloudPack
         end
       end
 
-      create_tags(connection.tags, server)
+      tags = {'Created-By' => 'Puppet'}
+      tags.merge! options[:tags] if options[:tags]
+
+      Puppet.notice('Creating tags for instance ... ')
+      create_tags(connection.tags, server.id, tags)
+      Puppet.notice('Creating tags for instance ... Done')
 
       Puppet.notice("Launching server #{server.id} ...")
       retries = 0
@@ -646,6 +674,7 @@ module Puppet::CloudPack
           "state"      => s.state,
           "dns_name"   => s.dns_name,
           "created_at" => s.created_at,
+          "tags"       => s.tags.inspect
         }
       end
       hsh
@@ -971,16 +1000,20 @@ module Puppet::CloudPack
       return server
     end
 
-    def create_tags(tags, server)
-      Puppet.notice('Creating tags for instance ...')
-      Puppet::CloudPack::Utils.retry_action( :timeout => 120 ) do
-        tags.create(
-          :key         => 'Created-By',
-          :value       => 'Puppet',
-          :resource_id => server.id
-        )
+    def create_tags(t_connection, resource_id, tags)
+      raise(ArgumentError, 'tags must be a hash') unless tags.is_a? Hash
+
+        tags.each do |tag,value|
+          Puppet.info("Creating tag for #{tag} ... ")
+          Puppet::CloudPack::Utils.retry_action( :timeout => 120 ) do
+            t_connection.create(
+              :key         => tag,
+              :value       => value,
+              :resource_id => resource_id
+            )
+          end
+        Puppet.info("Creating tag for #{tag} ... Done")
       end
-      Puppet.notice('Creating tags for instance ... Done')
     end
 
     def payload_type(payload)
