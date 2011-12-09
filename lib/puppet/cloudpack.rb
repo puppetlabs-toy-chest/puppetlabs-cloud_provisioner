@@ -23,9 +23,20 @@ module Puppet::CloudPack
       action.option '--availability-zone=' do
         summary 'AWS availability zone.'
         description <<-EOT
-          Specifies the availability zone into which the VM will be created
+          Specifies the availability zone into which the VM or Volume will be created
         EOT
      end
+    end
+    def add_create_volume_options(action)
+      add_availability_zone_option(action)
+
+      action.option '--size=', '-s=' do
+        summary 'The size (in GB) of the volume to create'
+      end
+
+      action.option '--snapshot=' do
+        summary 'The snapshot to base the volume on'
+      end
     end
     def add_region_option(action)
       action.option '--region=' do
@@ -101,6 +112,31 @@ module Puppet::CloudPack
       add_platform_option(action)
       add_region_option(action)
       add_availability_zone_option(action)
+
+      action.option '--volumes=', '-v=' do
+        summary 'The volumes to create and mount on the instance'
+        description <<-EOT
+          This option will create EBS volumes and mount them on the created
+          instance. Each volume is comma separated in the following format:
+          '/mount/path:size:snapshot_id'.  The snapshot_id is optional.·
+          If given, the volume will be created based on the snapshot with·
+          the id of the given snapshot_id
+        EOT
+
+        before_action do |action, args, options|
+          options[:volumes] = options[:volumes].split(',').map do |volume|
+            device, mount, size, snapshot  = volume.split(':')
+            { :mount => mount, :size => size, :zone  => options[:availability_zone], :snapshot => snapshot, :device => device }
+          end
+        end
+      end
+      action.option '--tags=', '-t=' do
+        summary 'The tags the instance should be tagged with'
+        description <<-EOT
+          Instances may be tagged with custom tags. The tags should be in the
+          format of key=value and comma-delineated.
+        EOT
+      end
 
       action.option '--image=', '-i=' do
         summary 'AMI to use when creating the instance.'
@@ -201,6 +237,16 @@ module Puppet::CloudPack
       add_platform_option(action)
       action.option '--force', '-f' do
         summary 'Forces termination of an instance.'
+      end
+      action.option '--delete-all-volumes' do
+        summary 'Delete all attached EBS volumes'
+
+        description <<-EOT
+          Normally the terminate action only deletes EBS volumes that were
+          specified by the AMI. Any EBS volumes that were attached after
+          the instance creation will not be deleted unless this parameter
+          is given
+        EOT
       end
     end
 
@@ -589,6 +635,16 @@ module Puppet::CloudPack
         end
       end
 
+     if options[:puppetagent_certname]
+        create_tag(connection.tags, server.id, { 'Name' => options[:puppetagent_certname] })
+      end
+      if options[:tags]
+        options[:tags].split(',').each do |tag|
+          key, value = tag.split('=')
+          create_tag(connection.tags, server.id, { key => value })
+        end
+      end
+
       create_tags(connection.tags, server)
 
       Puppet.notice("Launching server #{server.id} ...")
@@ -609,6 +665,34 @@ module Puppet::CloudPack
 
       # This is the earliest point we have knowledge of the DNS name
       Puppet.notice("Server #{server.id} public dns name: #{server.dns_name}")
+
+     # Create and attach volume to new instance
+      unless options[:volumes].nil?
+        options[:volumes].each do |volume|
+          begin
+            Puppet.notice("Creating volume for mount #{volume[:mount]} of size #{volume[:size]}")
+            vol_attributes = create_volume({ :size => volume[:size], :snapshot => volume[:snapshot], :availability_zone => volume[:zone] }, connection)
+          rescue => e
+            puts "Could not create volume: #{e}"
+          end
+
+          if options[:puppetagent_certname]
+            begin
+              Puppet.notice("Tagging volume #{volume[:mount]} with name #{options[:puppetagent_certname]}")
+              create_tag(connection.tags, vol_attributes['volumeId'], { 'Name' => options[:puppetagent_certname] })
+            rescue => e
+              puts "Could not tag volume: #{e}"
+            end
+          end
+
+          begin
+            Puppet.debug("Attaching volume #{vol_attributes['volumeId']}")
+            connection.attach_volume(server.id, vol_attributes['volumeId'], volume[:device])
+          rescue => e
+            puts "Could not attach volume: #{e}"
+          end
+        end
+      end
 
       if options[:_destroy_server_at_exit] == :create
         options.delete(:_destroy_server_at_exit)
@@ -646,6 +730,8 @@ module Puppet::CloudPack
           "state"      => s.state,
           "dns_name"   => s.dns_name,
           "created_at" => s.created_at,
+          "tags"       => s.tags.inspect,
+          "sec groups" => s.groups.inspect,
         }
       end
       hsh
@@ -937,9 +1023,22 @@ module Puppet::CloudPack
         # We're using myserver rather than server to prevent ruby 1.8 from
         # overwriting the server method argument
         servers.each do |myserver|
+          volumes = Array.new
+
+          if options[:delete_all_volumes]
+            volumes = myserver.volumes
+          end
+
           Puppet.notice "Destroying #{myserver.id} (#{myserver.dns_name}) ..."
           myserver.destroy()
           Puppet.notice "Destroying #{myserver.id} (#{myserver.dns_name}) ... Done"
+
+          #Has to be done after the instance is destroyed
+          volumes.each do |volume|
+            Puppet.notice "Destroying volume #{volume.id} ..."
+            Puppet::CloudPack::Utils.retry_action( :timeout => 120 ) { volume.destroy }
+            Puppet.notice "Destroying volume #{volume.id} ... Done"
+          end
         end
       elsif servers.empty?
         Puppet.warning "Could not find server with DNS name '#{server}'"
@@ -971,6 +1070,20 @@ module Puppet::CloudPack
       return server
     end
 
+    def create_tag(t_connection, resource_id, tags)
+      raise(Puppet::Error, 'Tag must be a hash')  unless tags.is_a? Hash
+
+      Puppet::CloudPack::Utils.retry_action( :timeout => 120 ) do
+        tags.each do |key,value|
+          t_connection.create(
+            :key         => key,
+            :value       => value,
+            :resource_id => resource_id
+          )
+        end
+      end
+    end
+
     def create_tags(tags, server)
       Puppet.notice('Creating tags for instance ...')
       Puppet::CloudPack::Utils.retry_action( :timeout => 120 ) do
@@ -981,6 +1094,23 @@ module Puppet::CloudPack
         )
       end
       Puppet.notice('Creating tags for instance ... Done')
+    end
+
+    def create_volume(options, connection = nil)
+      options = merge_default_options(options)
+      Puppet.notice('Creating EBS volume ...')
+
+      if connection.nil?
+        connection = create_connection(options)
+      end
+
+      unless options[:snapshot].nil?
+        volume = connection.create_volume(options[:availability_zone], options[:size], options[:snapshot])
+      else
+        volume = connection.create_volume(options[:availability_zone], options[:size])
+      end
+
+      volume.body
     end
 
     def payload_type(payload)
