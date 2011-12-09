@@ -42,7 +42,7 @@ describe Puppet::Face[:node_aws, :current] do
       end
     end
 
-    describe '(facts)' do
+    describe '(tags)' do
       let (:tags_hash) do { 'tag1' => 'value1', 'tag2' => 'value2', 'tag3' => 'value3.1=value3.2' }; end
 
       it 'should produce a hash correctly' do
