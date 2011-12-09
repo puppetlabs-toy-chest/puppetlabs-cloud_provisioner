@@ -15,6 +15,7 @@ describe Puppet::Face[:node_aws, :current] do
       :type     => 'm1.small',
       :keyname  => 'some_keypair',
       :region   => 'us-east-1',
+      :tags     => 'tag1=value1,tag2=value2'
     }
   end
 
@@ -38,6 +39,22 @@ describe Puppet::Face[:node_aws, :current] do
       it 'should validate the platform' do
         @options[:platform] = 'UnsupportedProvider'
         expect { subject.create(@options) }.to raise_error ArgumentError, /one of/
+      end
+    end
+
+    describe '(facts)' do
+      let (:tags_hash) do { 'tag1' => 'value1', 'tag2' => 'value2', 'tag3' => 'value3.1=value3.2' }; end
+
+      it 'should produce a hash correctly' do
+        Puppet::CloudPack.expects(:create).with do |options|
+          options[:tags] = tags_hash
+        end
+        subject.create(@options)
+      end
+
+      it 'should exit on improper value' do
+        @options[:tags] = 'tag1=value2,tag2=value,=broken'
+        expect { subject.create(@options) }.to raise_error ArgumentError, /could not parse/i
       end
     end
 
