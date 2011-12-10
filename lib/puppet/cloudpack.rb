@@ -117,7 +117,13 @@ module Puppet::CloudPack
           ## A regex is needed that will allow us to escape ',' characters
           ## from the CLI
           begin
-            options[:tags] = Hash[ options[:tags].split(',').map { |tag| tag.split('=',2) } ]
+            options[:tags] = Hash[ options[:tags].split(',').map do |tag| 
+              tag_array = tag.split('=',2)
+              if tag_array.size != 2
+                raise ArgumentError, 'Could not parse tags given. Please check your format'
+              end
+              tag_array
+            end ]
           rescue
             raise ArgumentError, 'Could not parse tags given. Please check your format'
           end
@@ -257,7 +263,13 @@ module Puppet::CloudPack
           ## A regex is needed that will allow us to escape ',' characters
           ## from the CLI
           begin
-            options[:facts] = Hash[ options[:facts].split(',').map { |fact| fact.split('=',2) } ]
+            options[:facts] = Hash[ options[:facts].split(',').map do |fact| 
+              fact_array = fact.split('=',2)
+              if fact_array.size != 2
+                raise ArgumentError, 'Could not parse facts given. Please check your format'
+              end
+              fact_array
+            end ]
           rescue
             raise ArgumentError, 'Could not parse facts given. Please check your format'
           end
