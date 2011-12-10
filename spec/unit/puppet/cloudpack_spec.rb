@@ -654,7 +654,7 @@ describe Puppet::CloudPack do
             :resource_id => 'i-1234'
           )
         end
-        subject.send :create_tags, tags, mock(:id => 'i-1234')
+        subject.send :create_tags, tags, 'i-1234', {'Created-By' => 'Puppet'}
       end
     end
 
