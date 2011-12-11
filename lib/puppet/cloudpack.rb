@@ -122,6 +122,9 @@ module Puppet::CloudPack
               if tag_array.size != 2
                 raise ArgumentError, 'Could not parse tags given. Please check your format'
               end
+              if [nil,''].include? tag_array[0] or [nil,''].include? tag_array[1]
+                raise ArgumentError, 'Could not parse tags given. Please check your format'
+              end
               tag_array
             end ]
           rescue
@@ -266,6 +269,9 @@ module Puppet::CloudPack
             options[:facts] = Hash[ options[:facts].split(',').map do |fact| 
               fact_array = fact.split('=',2)
               if fact_array.size != 2
+                raise ArgumentError, 'Could not parse facts given. Please check your format'
+              end
+              if [nil,''].include? fact_array[0] or [nil,''].include? fact_array[1]
                 raise ArgumentError, 'Could not parse facts given. Please check your format'
               end
               fact_array
