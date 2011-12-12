@@ -231,7 +231,7 @@ describe Puppet::CloudPack do
         @is_command_valid = false
         @has_keyfile = true
         Puppet::CloudPack.expects(:ssh_remote_execute).times(3).with do |server, login, command, keyfile|
-          if command =~ /^sudo bash -c 'chmod u\+x \S+gems\.sh; \S+gems\.sh'/
+          if command =~ /^sudo bash -c 'chmod u\+x \S+puppet-community\.sh; \S+puppet-community\.sh'/
             # set that the command is valid when it matches the regex
             # the test will pass is this is set to true
             @is_command_valid = true
@@ -248,7 +248,7 @@ describe Puppet::CloudPack do
         Puppet::CloudPack.expects(:ssh_connect).with(@server, 'root', @keyfile.path).returns(@mock_connection_tuple)
         @is_command_valid = false
         Puppet::CloudPack.expects(:ssh_remote_execute).times(3).with do |server, login, command, keyfile|
-          if command =~ /^bash -c 'chmod u\+x \S+gems\.sh; \S+gems\.sh'/
+          if command =~ /^bash -c 'chmod u\+x \S+puppet-community\.sh; \S+puppet-community\.sh'/
             # set that the command is valid when it matches the regex
             # the test will pass is this is set to true
             @is_command_valid = true
@@ -318,13 +318,70 @@ describe Puppet::CloudPack do
       let :http_fail do
         http_response_mock(:code => '400', :body => '[]')
       end
+
+      let :response_nodes_only_master do
+        [{"name"=>"puppetmaster",
+          "reported_at"=>"2011-11-03T05:35:36Z",
+          "created_at"=>"2011-11-02T02:28:35Z",
+          "last_apply_report_id"=>44,
+          "updated_at"=>"2011-11-03T05:35:41Z",
+          "url"=>nil,
+          "id"=>1,
+          "last_inspect_report_id"=>nil,
+          "description"=>nil,
+          "status"=>"unchanged",
+          "hidden"=>false}]
+      end
+
+      let :response_nodes_already_exists do
+        response_nodes_only_master << response_register_new_node
+      end
+
+      let :response_register_new_node do
+        { "name"=>"certname",
+          "reported_at"=>"2011-11-03T05:35:36Z",
+          "created_at"=>"2011-11-03T01:27:44Z",
+          "last_apply_report_id"=>45,
+          "updated_at"=>"2011-11-03T05:35:41Z",
+          "url"=>nil,
+          "id"=>7,
+          "last_inspect_report_id"=>nil,
+          "description"=>nil,
+          "status"=>"unchanged",
+          "hidden"=>false }
+      end
+
+      let :response_node_groups do
+        [{"name"=>"foo", "id"=>1}]
+      end
+
+      let :response_node_groups_does_not_exist do
+        [{"name"=>"bar", "id"=>2}]
+      end
+
+      let :response_node_group_members_already_registered do
+        [{"node_group_id"=>1, "node_id"=>7}]
+      end
+      let :response_node_group_members_not_registered do
+        [{"node_group_id"=>1, "node_id"=>1}]
+      end
+
       describe 'default options' do
         it 'should use the default enc options' do
-Puppet::Network::HttpPool.http_instance('puppet', 3000)
+          Puppet::Network::HttpPool.http_instance('puppet', 3000)
           Puppet::Network::HttpPool.expects(:http_instance).with('puppet', 3000).returns @http
-          @http.expects(:get).with('/nodes.json', {'Content-Type' => 'application/json'}).returns ok_host_list
-          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
-          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns ok_member_list
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/nodes.json' && action =~ /list nodes/i
+          end.returns(response_nodes_only_master)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/nodes.json' && action =~ /register node/i && data
+          end.returns(response_register_new_node) # <= This is the key expectation
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/node_groups.json' && action =~ /list groups/i
+          end.returns(response_node_groups)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/memberships.json' && action =~ /list group members/i
+          end.returns(response_node_group_members_already_registered)
           Puppet::Face[:node, :current].classify('certname', :node_group => 'foo')
         end
       end
@@ -334,40 +391,73 @@ Puppet::Network::HttpPool.http_instance('puppet', 3000)
           Puppet::Network::HttpPool.expects(:http_instance).with('server', '3000').returns @http
         end
         it 'should create a node if it does not already exist in Dashboard' do
-          @http.expects(:get).with('/nodes.json', @headers).returns empty_list
-          @http.expects(:post).with('/nodes.json', {'node' => {'name' => 'certname'}}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
-          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
-          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns ok_member_list
-         subject.classify('certname', @options)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/nodes.json' && action =~ /list nodes/i
+          end.returns(response_nodes_only_master)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/nodes.json' && action =~ /register node/i && data
+          end.returns(response_register_new_node) # <= This is the key expectation
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/node_groups.json' && action =~ /list groups/i
+          end.returns(response_node_groups)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/memberships.json' && action =~ /list group members/i
+          end.returns(response_node_group_members_already_registered)
+          subject.classify('certname', @options)
         end
 
         it 'should not create the node if it already exists in Dashboard' do
-          @http.expects(:get).with('/nodes.json', @headers).returns ok_host_list
-          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
-          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns empty_list
-          @http.expects(:post).with('/memberships.json', {'group_name'=> 'foo','node_name' => 'certname'}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/nodes.json' && action =~ /list nodes/i
+          end.returns(response_nodes_already_exists)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/nodes.json' && action =~ /register node/i && data
+          end.never # <= This is the key expectation
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/node_groups.json' && action =~ /list groups/i
+          end.returns(response_node_groups)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/memberships.json' && action =~ /list group members/i
+          end.returns(response_node_group_members_already_registered)
           subject.classify('certname', @options)
-
         end
         it 'should not add the node group to the node if it had already been added' do
-          @http.expects(:get).with('/nodes.json', @headers).returns empty_list
-          @http.expects(:post).with('/nodes.json', {'node' => {'name' => 'certname'}}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
-          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
-          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns ok_member_list
-          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).never
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/nodes.json' && action =~ /list nodes/i
+          end.returns(response_nodes_already_exists)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/node_groups.json' && action =~ /list groups/i
+          end.returns(response_node_groups)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/memberships.json' && action =~ /list group members/i
+          end.returns(response_node_group_members_already_registered)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/memberships.json' && action =~ /Classify node/i
+          end.never # <= This is the key expectation
           subject.classify('certname', @options)
         end
         it 'should add the node group to the node if it was not already added' do
-          @http.expects(:get).with('/nodes.json', @headers).returns empty_list
-          @http.expects(:post).with('/nodes.json', {'node' => {'name' => 'certname'}}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
-          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns ok_group_list
-          @http.expects(:get).with('/memberships.json', {'Content-Type' => 'application/json'}).returns empty_list
-          @http.expects(:post).with('/memberships.json', {'group_name'=> 'foo','node_name' => 'certname'}.to_pson, {'Content-Type' => 'application/json'}).returns ok_add
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/nodes.json' && action =~ /list nodes/i
+          end.returns(response_nodes_already_exists)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/node_groups.json' && action =~ /list groups/i
+          end.returns(response_node_groups)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/memberships.json' && action =~ /list group members/i
+          end.returns(response_node_group_members_not_registered)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/memberships.json' && action =~ /Classify node/i
+          end # <= This is the key expectation
           subject.classify('certname', @options)
         end
         it 'should fail when it cannot find the node group in the dashboard' do
-          @http.expects(:get).with('/nodes.json', @headers).returns ok_host_list
-          @http.expects(:get).with('/node_groups.json', {'Content-Type' => 'application/json'}).returns empty_list
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/nodes.json' && action =~ /list nodes/i
+          end.returns(response_nodes_already_exists)
+          subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
+            path == '/node_groups.json' && action =~ /list groups/i
+          end.returns(response_node_groups_does_not_exist)
           expect { subject.classify('certname', @options) }.should raise_error(Puppet::Error, /Groups must exist before they can be assigned to nodes/)
         end
       end
@@ -408,6 +498,7 @@ Puppet::Network::HttpPool.http_instance('puppet', 3000)
             subject.ssh_test_connect('server', 'root', @keyfile.path)
           end
           it 'should fail eventually' do
+            pending "JJM: (#10172) This timeout causes the tests to run WAY too slow.  We need to mock this better.  This test also appears to be in the wrong describe block"
             Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Net::SSH::AuthenticationFailed, 'root')
             expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.should raise_error(Puppet::CloudPack::Utils::RetryException::Timeout)
           end
@@ -520,10 +611,10 @@ Puppet::Network::HttpPool.http_instance('puppet', 3000)
         merged_options = subject.merge_default_options(@options)
         merged_options.should include(:install_script)
       end
-      it 'should set the installer script to gems when unset' do
+      it 'should set the installer script to puppet-community when unset' do
         (opts = @options.dup).delete(:install_script)
         merged_options = subject.merge_default_options(opts)
-        merged_options[:install_script].should eq('gems')
+        merged_options[:install_script].should eq('puppet-community')
       end
       it 'should allow the user to specify the install script' do
         merged_options = subject.merge_default_options(@options)
@@ -535,6 +626,14 @@ Puppet::Network::HttpPool.http_instance('puppet', 3000)
       it 'should create a new connection' do
         Fog::Compute.expects(:new).with(:provider => 'SomeProvider')
         subject.send :create_connection, :platform => 'SomeProvider'
+      end
+
+      it 'should use auxiliary credentials' do
+        Fog.expects(:credential=).with(:SomeCredential)
+        Fog::Compute.expects(:new).with(:provider => 'SomeProvider')
+        subject.send :create_connection,
+          :platform    => 'SomeProvider',
+          :credentials => 'SomeCredential'
       end
     end
 
@@ -555,7 +654,73 @@ Puppet::Network::HttpPool.http_instance('puppet', 3000)
             :resource_id => 'i-1234'
           )
         end
-        subject.send :create_tags, tags, mock(:id => 'i-1234')
+        subject.send :create_tags, tags, 'i-1234', {'Created-By' => 'Puppet'}
+      end
+    end
+
+    describe '#http_request' do
+      let :http do
+        http = mock('Net::Http')
+        http.expects(:start).returns(http_response)
+        http
+      end
+      let :http_post do
+        http = mock('Net::Http')
+        http.expects(:start).with() do
+        end
+      end
+      let :options do
+        { :enc_server=>"puppetmaster", :enc_port=>"3000" }
+      end
+      let :options_ssl_auth do
+        options.merge({ :enc_ssl=>true, :enc_auth_user=>"console", :enc_auth_passwd=>"puppet"})
+      end
+      let :http_response do
+        stub_everything('Net::HTTPOK')
+      end
+      let :request do
+        request = mock('Net::Http::Post')
+        request.expects(:set_content_type).with('application/json')
+        request
+      end
+      let :somedata do
+        { 'node' => { 'name' => 'puppetagent.certname' } }
+      end
+      # http_request(http, path, options = {}, action = nil, expected_code = '200', data = nil)
+      it 'Should default to expecting a 200 response' do
+        subject.expects(:handle_json_response).with(http_response, '/foo.json', '200')
+        subject.http_request(http, '/foo.json', options)
+      end
+      it 'Should return whatever handle_json_response() returns' do
+        subject.expects(:handle_json_response).with(http_response, '/foo.json', '200').returns('OK')
+        subject.http_request(http, '/foo.json', options).should eq 'OK'
+      end
+      it 'Should support an action description' do
+        subject.expects(:handle_json_response).with(http_response, 'Get Foo', '200')
+        subject.http_request(http, '/foo.json', options, 'Get Foo')
+      end
+      it 'Should support HTTP codes other than 200' do
+        subject.expects(:handle_json_response).with(http_response, 'Get Foo', '201')
+        subject.http_request(http, '/foo.json', options, 'Get Foo', '201')
+      end
+      it 'Should set the request body when data is provided' do
+        Net::HTTP::Post.expects(:new).returns(request)
+        request.expects(:body=).with(somedata.to_pson)
+        subject.expects(:handle_json_response).with(http_response, 'Post Foo', '201')
+        subject.http_request(http, '/foo.json', options, 'Post Foo', '201', somedata)
+      end
+      it 'Should set authentication data when --enc-auth-user is not nil and data is provided' do
+        Net::HTTP::Post.expects(:new).returns(request)
+        request.expects(:body=).with(somedata.to_pson)
+        request.expects(:basic_auth).with(options_ssl_auth[:enc_auth_user], options_ssl_auth[:enc_auth_passwd])
+        subject.expects(:handle_json_response).with(http_response, 'Post Foo', '201')
+        subject.http_request(http, '/foo.json', options_ssl_auth, 'Post Foo', '201', somedata)
+      end
+      it 'Should set authentication data when --enc-auth-user is not nil and data is not provided' do
+        Net::HTTP::Get.expects(:new).returns(request)
+        request.expects(:basic_auth).with(options_ssl_auth[:enc_auth_user], options_ssl_auth[:enc_auth_passwd])
+        subject.expects(:handle_json_response).with(http_response, 'Post Foo', '201')
+        subject.http_request(http, '/foo.json', options_ssl_auth, 'Post Foo', '201')
       end
     end
   end

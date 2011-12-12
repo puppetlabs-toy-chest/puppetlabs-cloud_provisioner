@@ -16,7 +16,7 @@ module Puppet::CloudPack
     # defaults, so they all call merge_default_options() to ensure the keys are
     # set.
     def merge_default_options(options)
-      default_options = { :region => 'us-east-1', :platform => 'AWS', :install_script => 'gems' }
+      default_options = { :region => 'us-east-1', :platform => 'AWS', :install_script => 'puppet-community' }
       default_options.merge(options)
     end
     def add_availability_zone_option(action)
@@ -56,7 +56,20 @@ module Puppet::CloudPack
       end
     end
 
+    def add_credential_option(action)
+      action.option '--credentials=' do
+        summary 'Cloud credentials to use from ~/.fog'
+        description <<-EOT
+          For accessing more than a single account, auxiliary credentials other
+          than 'default' may be supplied in the credentials location (usually
+          ~/.fog).
+        EOT
+      end
+    end
+
     def add_platform_option(action)
+      add_credential_option(action)
+
       action.option '--platform=' do
         summary 'Platform used to create machine instance (only supports AWS).'
         description <<-EOT
@@ -89,12 +102,44 @@ module Puppet::CloudPack
       add_region_option(action)
       add_availability_zone_option(action)
 
+      action.option '--tags=', '-t=' do
+        summary 'The tags the instance should have in format tag1=value1,tag2=value2'
+        description <<-EOT
+          Instances may be tagged with custom tags. The tags should be in the
+          format of tag1=value,tag2=value. Currently there is not way escape
+          the ',' character so tags cannot contain this character.
+        EOT
+
+        before_action do |action, arguments, options|
+          ## This converts 'this=that,foo=bar,biz=baz=also' to
+          ## { 'this' => 'that', 'foo' => 'bar', 'biz' => 'baz=also'}
+          ##
+          ## A regex is needed that will allow us to escape ',' characters
+          ## from the CLI
+          begin
+            options[:tags] = Hash[ options[:tags].split(',').map do |tag| 
+              tag_array = tag.split('=',2)
+              if tag_array.size != 2
+                raise ArgumentError, 'Could not parse tags given. Please check your format'
+              end
+              if [nil,''].include? tag_array[0] or [nil,''].include? tag_array[1]
+                raise ArgumentError, 'Could not parse tags given. Please check your format'
+              end
+              tag_array
+            end ]
+          rescue
+            raise ArgumentError, 'Could not parse tags given. Please check your format'
+          end
+        end
+
+      end
+
       action.option '--image=', '-i=' do
         summary 'AMI to use when creating the instance.'
         description <<-EOT
-          Pre-configured operating system image used to create machine instance.
-          This currently only supports AMI images.
-          Example of a Redhat 5.6 32bit image: ami-b241bfdb
+          The pre-configured operating system image to use when creating this
+          machine instance. Currently, only AMI images are supported. Example
+          of a Redhat 5.6 32bit image: ami-b241bfdb
         EOT
         required
         before_action do |action, args, options|
@@ -110,8 +155,8 @@ module Puppet::CloudPack
       action.option '--type=' do
         summary 'Type of instance.'
         description <<-EOT
-          Type of instance to be launched. Type specifies characteristics that
-          a machine will have such as architecture, memory, processing power, storage
+          Type of instance to be launched. The type specifies characteristics that
+          a machine will have, such as architecture, memory, processing power, storage,
           and IO performance. The type selected will determine the cost of a machine instance.
           Supported types are: 'm1.small','m1.large','m1.xlarge','t1.micro','m2.xlarge',
           'm2.2xlarge','x2.4xlarge','c1.medium','c1.xlarge','cc1.4xlarge'.
@@ -120,20 +165,22 @@ module Puppet::CloudPack
         before_action do |action, args, options|
           supported_types = ['m1.small','m1.large','m1.xlarge','t1.micro','m2.xlarge','m2.2xlarge','x2.4xlarge','c1.medium','c1.xlarge','cc1.4xlarge']
           unless supported_types.include?(options[:type])
-            raise ArgumentError, "Platform must be one of the following: #{supported_types.join(', ')}"
+            raise ArgumentError, "Type must be one of the following: #{supported_types.join(', ')}"
           end
         end
       end
 
       action.option '--keyname=' do
-        summary 'The AWS SSH key name as shown in the AWS console.  Please see the related list_keynames action.'
+        summary 'The AWS SSH key name as shown in the AWS console. See the list_keynames action.'
         description <<-EOT
-          This options expects the name of the SSH key pair as listed in the
-          Amazon AWS console.  Cloud Provisioner will use this information to tell Amazon
-          to install the public SSH key into the authorized_keys file of the new EC2
-          instance.  This is a related, but distinct, option from the --keyfile option of
-          the install action.  To obtain a listing of valid keynames please see the
-          list_keynames action.
+          The name of the SSH key pair to use, as listed in the Amazon AWS
+          console.  When creating the instance, Amazon will install the
+          requested SSH public key into the instance's authorized_keys file.
+          Not to be confused with the --keyfile option of the `node`
+          subcommand's `install` action.
+
+          You can use the `list_keynames` action to get a list of valid key
+          pairs.
         EOT
         required
         before_action do |action, args, options|
@@ -149,10 +196,11 @@ module Puppet::CloudPack
       action.option '--group=', '-g=', '--security-group=' do
         summary "The instance's security group(s)."
         description <<-EOT
-          The security group(s) that the machine will be associated with.
-          A security group determines the rules for both inbound as well as
-          outbound connections.
-          Multiple groups can be specified as a list using ':'.
+          The security group(s) that the machine will be associated with. A
+          security group determines the rules for both inbound and outbound
+          connections.
+
+          Multiple groups can be specified as a colon-separated list.
         EOT
         before_action do |action, args, options|
           Puppet::CloudPack.group_option_before_action(options)
@@ -194,27 +242,68 @@ module Puppet::CloudPack
     end
 
     def add_install_options(action)
+      action.option '--facts=' do
+        summary 'Set custom facts in format of fact1=value,fact2=value'
+        description <<-'EOT'
+          To install custom facts during install of a node, use the format
+          fact1=value,fact2=value. Currently, there is no way to escape 
+          the ',' character so facts cannot contain this character.
+
+          Requirements:
+          For community installs of puppet, i.e. not Puppet Enterprise,
+          the Puppet Labs' `stdlib` module will be required. It can be found
+          at 'http://forge.puppetlabs.com/puppetlabs/stdlib' or installed
+          with the command 'puppet-module install puppetlabs/stdlib'.
+
+          For Puppet Enterprise installs, there are no extra requirements
+          for this option to work
+        EOT
+
+        before_action do |action, arguments, options|
+          ## This converts 'this=that,foo=bar,biz=baz=also' to
+          ## { 'this' => 'that', 'foo' => 'barr', 'biz' => 'baz=also'}
+          ##
+          ## A regex is needed that will allow us to escape ',' characters
+          ## from the CLI
+          begin
+            options[:facts] = Hash[ options[:facts].split(',').map do |fact| 
+              fact_array = fact.split('=',2)
+              if fact_array.size != 2
+                raise ArgumentError, 'Could not parse facts given. Please check your format'
+              end
+              if [nil,''].include? fact_array[0] or [nil,''].include? fact_array[1]
+                raise ArgumentError, 'Could not parse facts given. Please check your format'
+              end
+              fact_array
+            end ]
+          rescue
+            raise ArgumentError, 'Could not parse facts given. Please check your format'
+          end
+        end
+      end
+
       action.option '--login=', '-l=', '--username=' do
-        summary 'User to login to the instance as.'
+        summary 'User to log in to the instance as.'
         description <<-EOT
-          The name of the user to login to the instance as.
-          This should be the same user who has been configured
-          with your key pair for passwordless access.
+          The name of the user Puppet should use when logging in to the node.
+          This user should configured to allow passwordless access via the SSH
+          key supplied in the --keyfile option.
+
           This is usually the root user.
         EOT
         required
       end
 
       action.option '--keyfile=' do
-        summary "The path to the local SSH private key or 'agent' if the private key is loaded in an agent"
+        summary "The path to a local SSH private key (or 'agent' if using an agent)."
         description <<-EOT
-          This option expects the filesystem path to the local private key that
-          can be used to ssh into the instance. If the instance was created with the
-          create action, this should be the path to the private key file downloaded
-          from the Amazon AWS EC2.
+          The filesystem path to a local private key that can be used to SSH
+          into the node. If the node was created with the `node_aws` `create`
+          action, this should be the path to the private key file downloaded
+          from the Amazon EC2 interface.
 
-          Specify 'agent' if you have the key loaded in your agent and available via
-          the SSH_AUTH_SOCK variable.
+          Specify 'agent' if you have the key loaded in ssh-agent and
+          available via the SSH_AUTH_SOCK variable.
         EOT
         required
         before_action do |action, arguments, options|
@@ -226,7 +315,7 @@ module Puppet::CloudPack
             # Check if the user actually has access to an Agent.
             if ! ENV['SSH_AUTH_SOCK'] then
               raise ArgumentError,
-                "SSH_AUTH_SOCK environment variable is not set and you specified --agent keyfile.  Please check that ssh-agent is running correctly, or perhaps SSH agent forwarding is disabled."
+                "SSH_AUTH_SOCK environment variable is not set and you specified --keyfile agent.  Please check that ssh-agent is running correctly, and that SSH agent forwarding is not disabled."
             end
             # We break out of the before action block because we don't really
             # have anything else to do to support ssh agent authentication.
@@ -244,12 +333,12 @@ module Puppet::CloudPack
       end
 
       action.option '--installer-payload=' do
-        summary 'The location of the Puppet Enterprise universal gzipped tarball'
+        summary 'The location of the Puppet Enterprise universal gzipped tarball.'
         description <<-EOT
-          Location of the Puppet enterprise universal tarball to be used
-          for the installation. This option is only required if Puppet
-          should be installed on the machine using this image.
-          This tarball must be zipped.
+          Location of the Puppet enterprise universal tarball to be used for
+          the installation. Can be a local file path or a URL. This option is
+          only required if Puppet should be installed on the machine. The
+          tarball specified must be gzipped.
         EOT
         before_action do |action, arguments, options|
           type = Puppet::CloudPack.payload_type(options[:installer_payload])
@@ -272,7 +361,7 @@ module Puppet::CloudPack
       end
 
       action.option '--installer-answers=' do
-        summary 'Answers file to be used for PE installation'
+        summary 'Answers file to be used for PE installation.'
         description <<-EOT
           Location of the answers file that should be copied to the machine
           to install Puppet Enterprise.
@@ -289,28 +378,28 @@ module Puppet::CloudPack
       end
 
       action.option '--puppetagent-certname=' do
-        summary 'The Puppet Agent certificate name to configure on the target system'
+        summary 'The puppet agent certificate name to configure on the target system.'
         description <<-EOT
-          This option allows you to specify an optional Puppet Agent
+          This option allows you to specify an optional puppet agent
           certificate name to configure on the target system.  This option
           applies to the puppet-enterprise and puppet-enterprise-http
           installation scripts.  If provided, this option will replace any
           puppet agent certificate name provided in the puppet enterprise
-          answers file.  This certificate name will show up in the Puppet Dashboard
-          when the agent checks in for the first time.
+          answers file.  This certificate name will show up in the console (or
+          Puppet Dashboard) when the agent checks in for the first time.
         EOT
       end
 
       action.option '--install-script=' do
-        summary 'Name of the template to use for installation'
+        summary 'The method to use when installing Puppet.'
         description <<-EOT
-          Name of the template to use for installation. The current
+          Name of the installation template to use when installing Puppet. The current
           list of supported templates is: gems, puppet-enterprise
         EOT
       end
 
       action.option '--puppet-version=' do
-        summary 'version of Puppet to install'
+        summary 'Version of Puppet to install.'
         description <<-EOT
           Version of Puppet to be installed. This version is
           passed to the Puppet installer script.
@@ -323,7 +412,7 @@ module Puppet::CloudPack
       end
 
       action.option '--pe-version=' do
-        summary 'version of Puppet Enterprise to install'
+        summary 'Version of Puppet Enterprise to install.'
         description <<-EOT
           Version of Puppet Enterprise to be passed to the installer script.
           Defaults to 1.1.
@@ -336,7 +425,7 @@ module Puppet::CloudPack
       end
 
       action.option '--facter-version=' do
-        summary 'version of facter to install'
+        summary 'Version of facter to install.'
         description <<-EOT
           The version of facter that should be installed.
           This only makes sense in open source installation
@@ -351,12 +440,22 @@ module Puppet::CloudPack
     end
 
     def add_classify_options(action)
+      action.option '--enc-ssl' do
+        summary 'Whether to use SSL when connecting to the ENC.'
+        description <<-'EOT'
+          By default, we do not connect to the ENC over SSL.  This option
+          configures all HTTP connections to the ENC to use SSL in order to
+          provide encryption. This option should be set when using Puppet
+          Enterprise 2.0 and higher.
+        EOT
+      end
+
       action.option '--enc-server=' do
-        summary 'The External Node Classifier URL.'
+        summary 'The external node classifier hostname.'
         description <<-EOT
-          The URL of the External Node Classifier.
-          This currently only supports the Dashboard
-          as an external node classifier.
+          The hostname of the external node classifier.  This currently only
+          supports Puppet Enterprise's console and Puppet Dashboard as external
+          node classifiers.
         EOT
         default_to do
           Puppet[:server]
@@ -364,19 +463,53 @@ module Puppet::CloudPack
       end
 
       action.option '--enc-port=' do
-        summary 'The External Node Classifier Port'
+        summary 'The External Node Classifier Port.'
         description <<-EOT
-          The port of the External Node Classifier.
-          This currently only supports the Dashboard
-          as an external node classifier.
+          The port of the External Node Classifier.  This currently only
+          supports Puppet Enterprise's console and Puppet Dashboard as external
+          node classifiers.
         EOT
-        default_to do
-          3000
-        end
+        default_to do 3000 end
+      end
+
+      action.option '--enc-auth-user=' do
+        summary 'User name for authentication to the ENC.'
+        description <<-EOT
+          PE's console and Puppet Dashboard can be secured using HTTP
+          authentication.  If the console or dashboard is configured with HTTP
+          authentication, use this option to supply credentials for accessing it.
+
+          Note: This option will default to the PUPPET_ENC_AUTH_USER
+          environment variable.  Please use this environment variable if you
+          are concerned about usernames and passwords being exposed via the
+          Unix process table.
+        EOT
+        default_to do ENV['PUPPET_ENC_AUTH_USER'] end
+      end
+
+      action.option '--enc-auth-passwd=' do
+        summary 'Password for authentication to the ENC.'
+        description <<-EOT
+          PE's console and Puppet Dashboard can be secured using HTTP
+          authentication.  If the console or dashboard is configured with HTTP
+          authentication, use this option to supply credentials for accessing it.
+
+          Note: This option will default to the PUPPET_ENC_AUTH_PASSWD
+          environment variable.  Please use this environment variable if you
+          are concerned about usernames and passwords being exposed via the
+          Unix process table.
+        EOT
+        default_to do ENV['PUPPET_ENC_AUTH_PASSWD'] end
       end
 
       action.option '--node-group=', '--as=' do
-        summary 'The Puppet Dashboard node group to add to.'
+        summary 'The ENC node group to associate the node with.'
+        description <<-'EOT'
+          The PE console or Puppet Dashboard group to associate the node with.
+          The group must already exist in the ENC, or an error will be
+          returned.  If the node has not been registered with the ENC, it will
+          automatically be registered when assigning it to a group.
+        EOT
       end
     end
 
@@ -395,70 +528,73 @@ module Puppet::CloudPack
     end
 
     def dashboard_classify(certname, options)
-      Puppet.info "Using http://#{options[:enc_server]}:#{options[:enc_port]} as Dashboard."
+      # The Net::HTTP client instance
       http = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
 
-      # Workaround for the fact that Dashboard is typically insecure.
-      http.use_ssl = false
-      headers = { 'Content-Type' => 'application/json' }
-
-      begin
-        Puppet.notice "Registering node: #{certname} ..."
-        # get the list of nodes that have been specified in the Dashboard
-        response = http.get('/nodes.json', headers )
-        nodes = handle_json_response(response, 'List nodes')
-        node = nodes.detect { |node| node['name'] == certname }
-        node_info = if node
-          Puppet.notice("Node: #{certname} already exists in Dashboard, not creating")
-          node
-        else
-          # create the node if it does not exist
-          data = { 'node' => { 'name' => certname } }
-          response = http.post('/nodes.json', data.to_pson, headers)
-          handle_json_response(response, 'Registering node', '201')
-        end
-        node_id = node_info['id']
-
-        # checking if the specified group even exists
-        response = http.get('/node_groups.json', headers )
-        node_groups = handle_json_response(response, 'List groups')
-
-        node_group_info = node_groups.detect {|group| group['name'] == options[:node_group] }
-        unless node_group_info
-          raise Puppet::Error, "Group #{options[:node_group]} does not exist in Dashboard. Groups must exist before they can be assigned to nodes."
-        end
-        node_group_id = node_group_info['id']
-
-        Puppet.notice 'Classifying node ...'
-        response = http.get("/memberships.json", headers)
-        memberships = handle_json_response(response, 'List memberships')
-        if memberships.detect{ |members| members['node_group_id'] == node_group_id and members['node_id'] == node_id }
-          Puppet.warning("Group #{options[:node_group]} already added to node #{options[:node_name]}, nothing to do")
-        else
-          # add the node group to the node if the relationship did not already exist
-          data = { 'node_name' => certname, 'group_name' => options[:node_group] }
-          response = http.post("/memberships.json", data.to_pson, headers)
-          handle_json_response(response, 'Classify node', '201')
-        end
-      rescue Errno::ECONNREFUSED
-        Puppet.warning 'Registering node ... Error'
-        Puppet.err "Could not connect to host http://#{options[:enc_server]}:#{options[:enc_port]}"
-        Puppet.err "Check your --enc_server and --enc_port options"
-        exit(1)
+      if options[:enc_ssl] then
+        http.use_ssl = true
+        uri_scheme = 'https'
+        # We intentionally use SSL only for encryption and not authenticity checking
+        http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      else
+        http.use_ssl = false
+        uri_scheme = 'http'
       end
 
-      return nil
+      Puppet.notice "Contacting #{uri_scheme}://#{options[:enc_server]}:#{options[:enc_port]}/ to classify #{certname}"
+
+      # This block create the node and returns it to the caller
+      notfound_register_the_node = lambda do
+        data = { 'node' => { 'name' => certname } }
+        http_request(http, '/nodes.json', options, 'Register Node', '201', data)
+      end
+      # Get a list of nodes to check if we need to create the node or not
+      nodes = http_request(http, '/nodes.json', options, 'List nodes')
+      # Find an existing node or register the node using the lambda block
+      node = nodes.find(notfound_register_the_node) do |node|
+        node['name'] == certname
+      end
+      node_id = node['id']
+
+      # checking if the specified group even exists
+      notfound_group_dne_error = lambda do
+        raise Puppet::Error, "Group #{options[:node_group]} does not exist in the console/Dashboard. Groups must exist before they can be assigned to nodes."
+      end
+      node_groups = http_request(http, '/node_groups.json', options, 'List Groups')
+      node_group_info = node_groups.find(notfound_group_dne_error) do |group|
+        group['name'] == options[:node_group]
+      end
+      node_group_id = node_group_info['id']
+
+      # Finally add the node to the group.
+      notfound_associate_node = lambda do
+        data = { 'node_name' => certname, 'group_name' => options[:node_group] }
+        http_request(http, '/memberships.json', options, 'Classify node', '201', data)
+      end
+
+      memberships = http_request(http, '/memberships.json', options, 'List group members')
+      response = memberships.find(notfound_associate_node) do |members|
+        members['node_group_id'] == node_group_id and members['node_id'] == node_id
+      end
+
+      return { 'status' => 'complete' }
     end
 
     def handle_json_response(response, action, expected_code='200')
       if response.code == expected_code
-        Puppet.notice "#{action} ... Done"
+        Puppet.info "#{action} ... Done"
         PSON.parse response.body
       else
         # I should probably raise an exception!
         Puppet.warning "#{action} ... Failed"
         Puppet.info("Body: #{response.body}")
         Puppet.warning "Server responded with a #{response.code} status"
+        case response.code
+        when /401/
+          Puppet.notice "A 401 response is the HTTP code for an Unauthorized request"
+          Puppet.notice "This error likely means you need to supply the --enc-auth-user and --enc-auth-passwd options"
+          Puppet.notice "Alternatively set PUPPET_ENC_AUTH_PASSWD environment variable for increased security"
+        end
         raise Puppet::Error, "Could not: #{action}, got #{response.code} expected #{expected_code}"
       end
     end
@@ -494,7 +630,12 @@ module Puppet::CloudPack
         end
       end
 
-      create_tags(connection.tags, server)
+      tags = {'Created-By' => 'Puppet'}
+      tags.merge! options[:tags] if options[:tags]
+
+      Puppet.notice('Creating tags for instance ... ')
+      create_tags(connection.tags, server.id, tags)
+      Puppet.notice('Creating tags for instance ... Done')
 
       Puppet.notice("Launching server #{server.id} ...")
       retries = 0
@@ -551,6 +692,7 @@ module Puppet::CloudPack
           "state"      => s.state,
           "dns_name"   => s.dns_name,
           "created_at" => s.created_at,
+          "tags"       => s.tags.inspect
         }
       end
       hsh
@@ -635,6 +777,12 @@ module Puppet::CloudPack
         options[:keyfile] = nil
       end
 
+      #Figure out our puppetagent-certname value
+      if not options[:puppetagent_certname]
+        options[:puppetagent_certname] = "#{server}-#{Guid.new.to_s}"
+        options[:autogenerated_certname] = true
+      end
+
       # Figure out if we need to be root
       cmd_prefix = options[:login] == 'root' ? '' : 'sudo '
 
@@ -703,6 +851,7 @@ module Puppet::CloudPack
       begin
         Net::SSH.start(server, login, ssh_opts) do |session|
           session.open_channel do |channel|
+            channel.request_pty
             channel.on_data do |ch, data|
               buffer << data
               stdout << data
@@ -729,7 +878,7 @@ module Puppet::CloudPack
           end
         end
       rescue Net::SSH::AuthenticationFailed => user
-        raise Puppet::Error, "Authentication failure for user #{user}. Please check the keyfile and try again."
+        raise Net::SSH::AuthenticationFailed, "Authentication failure for user #{user}. Please check the keyfile and try again."
       end
 
       Puppet.info "Executing remote command ... Done"
@@ -741,6 +890,7 @@ module Puppet::CloudPack
 
       retry_exceptions = {
           Net::SSH::AuthenticationFailed => "Failed to connect. This may be because the machine is booting.\nRetrying the connection...",
+          Errno::EHOSTUNREACH            => "Failed to connect. This may be because the machine is booting.  Retrying the connection..",
           Errno::ECONNREFUSED            => "Failed to connect. This may be because the machine is booting.  Retrying the connection...",
           Errno::ETIMEDOUT               => "Failed to connect. This may be because the machine is booting.  Retrying the connection..",
           Errno::ECONNRESET              => "Connection reset. Retrying the connection...",
@@ -852,6 +1002,7 @@ module Puppet::CloudPack
       # that pass in a provider string that does not match 'AWS'.  This makes
       # the test pass by preventing Fog from throwing an error when the region
       # option is not expected
+      Fog.credential = options[:credentials].to_sym if options[:credentials]
       case options[:platform]
       when 'AWS'
         Fog::Compute.new(:provider => options[:platform], :region => options[:region])
@@ -867,16 +1018,20 @@ module Puppet::CloudPack
       return server
     end
 
-    def create_tags(tags, server)
-      Puppet.notice('Creating tags for instance ...')
-      Puppet::CloudPack::Utils.retry_action( :timeout => 120 ) do
-        tags.create(
-          :key         => 'Created-By',
-          :value       => 'Puppet',
-          :resource_id => server.id
-        )
+    def create_tags(t_connection, resource_id, tags)
+      raise(ArgumentError, 'tags must be a hash') unless tags.is_a? Hash
+
+        tags.each do |tag,value|
+          Puppet.info("Creating tag for #{tag} ... ")
+          Puppet::CloudPack::Utils.retry_action( :timeout => 120 ) do
+            t_connection.create(
+              :key         => tag,
+              :value       => value,
+              :resource_id => resource_id
+            )
+          end
+        Puppet.info("Creating tag for #{tag} ... Done")
       end
-      Puppet.notice('Creating tags for instance ... Done')
     end
 
     def payload_type(payload)
@@ -891,6 +1046,72 @@ module Puppet::CloudPack
         # assuming that everything else is a valid filepath
         :file_path
       end
+    end
+
+    # Method to make generic, SSL, Authenticated HTTP requests
+    # and parse the JSON response.  Primarily for #10377 and #10197
+    def http_request(http, path, options = {}, action = nil, expected_code = '200', data = nil)
+      action ||= path
+      # We need to POST data, otherwise we'll use GET
+      request = data ? Net::HTTP::Post.new(path) : Net::HTTP::Get.new(path)
+      # Set the form data
+      request.body = data.to_pson if data
+      # Authentication information
+      request.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) if ! options[:enc_auth_user].nil?
+      # Content Type of the request
+      request.set_content_type('application/json')
+
+      # Wrap the request in an exception handler
+      begin
+        response = http.start { |http| http.request(request) }
+      rescue Errno::ECONNREFUSED => e
+        Puppet.warning 'Registering node ... Error'
+        Puppet.err "Could not connect to host #{options[:enc_server]} on port #{options[:enc_port]}"
+        Puppet.err "This could be because a local host firewall is blocking the connection"
+        Puppet.err "Please check your --enc-server and --enc-port options"
+        ex = Puppet::Error.new(e)
+        ex.set_backtrace(e.backtrace)
+        raise ex
+      end
+      # Return the parsed JSON response
+      handle_json_response(response, action, expected_code)
+    end
+
+    # Take a block and a timeout and display a progress bar while we're doing our thing
+    def do_in_progress_bar(options = {}, &blk)
+      timeout = options[:timeout].to_i
+      start_time = Time.now
+      abort_time = start_time + timeout
+
+      Puppet.notice "#{options[:notice]} (Started at #{start_time.strftime("%I:%M:%S %p")})"
+      eta_msg = if (timeout <= 120) then
+                  "#{timeout} seconds at #{abort_time.strftime("%I:%M:%S %p")}"
+                else
+                  "#{timeout / 60} minutes at #{abort_time.strftime("%I:%M %p")}"
+                end
+      Puppet.notice "Control will be returned to you in #{eta_msg} if #{options[:message].downcase} is unfinished."
+
+      progress_bar = Puppet::CloudPack::ProgressBar.new(options[:message], timeout)
+      progress_mutex = Mutex.new
+
+      progress_thread = Thread.new do
+        loop do
+          progress = Time.now - start_time
+          progress_mutex.synchronize { progress_bar.set progress }
+          sleep 0.5
+        end
+      end
+
+      block_return_value = nil
+      begin
+        Timeout.timeout(timeout) do
+          block_return_value = blk.call
+        end
+      ensure
+        progress_mutex.synchronize { progress_bar.finish; progress_thread.kill }
+      end
+      end_time = Time.now
+      block_return_value
     end
   end
 end

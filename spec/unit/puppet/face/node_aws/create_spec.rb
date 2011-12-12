@@ -41,6 +41,22 @@ describe Puppet::Face[:node_aws, :current] do
       end
     end
 
+    describe '(tags)' do
+      let (:tags_hash) do { 'tag1' => 'value1', 'tag2' => 'value2', 'tag3' => 'value3.1=value3.2' }; end
+
+      it 'should produce a hash correctly' do
+        Puppet::CloudPack.expects(:create).with do |options|
+          options[:tags] = tags_hash
+        end
+        subject.create(@options)
+      end
+
+      it 'should exit on improper value' do
+        @options[:tags] = 'tag1=value2,tag2=value,=broken'
+        expect { subject.create(@options) }.to raise_error ArgumentError, /could not parse/i
+      end
+    end
+
     describe '(type)' do
       it 'should require a type' do
         @options.delete(:type)
@@ -78,13 +94,6 @@ describe Puppet::Face[:node_aws, :current] do
           /unrecognized.*: #{@options[:keyname]}/i
       end
     end
-    describe '(availability_zone)' do
-      it "should validate the availability zone" do
-        @options[:availability_zone] = 'test-puppet-zone'
-        expect { subject.create(@options) }.to raise_error ArgumentError, /Invalid availability zone/
-      end
-    end
-
     describe '(region)' do
       it "should set the region to us-east-1 if no region is supplied" do
         @options.delete(:region)
