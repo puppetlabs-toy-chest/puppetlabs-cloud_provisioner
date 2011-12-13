@@ -192,6 +192,13 @@ module Puppet::CloudPack
           end
         end
       end
+      action.option '--subnet=', '-s='  do
+        summary "The subnet in which to deploy the VM (VPC only)"
+        description <<-EOT
+           This is the ID of the subnet in which you wish the vm to reside.
+           This feature is only available when using EC2's VPC feature.
+        EOT
+      end
 
       action.option '--group=', '-g=', '--security-group=' do
         summary "The instance's security group(s)."
@@ -617,6 +624,7 @@ module Puppet::CloudPack
         :key_name   => options[:keyname],
         :groups     => options[:group],
         :flavor_id  => options[:type],
+        :subnet_id     => options[:subnet],
         :availability_zone => options[:availability_zone]
       )
 
