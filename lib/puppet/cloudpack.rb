@@ -831,7 +831,7 @@ module Puppet::CloudPack
       if results[:exit_code] == 0 then
         puppetagent_certname = results[:stdout].strip
       else
-        Puppet.warn "Could not determine the remote puppet agent certificate name using #{certname_command}"
+        Puppet.warning "Could not determine the remote puppet agent certificate name using #{certname_command}"
         puppetagent_certname = nil
       end
 
