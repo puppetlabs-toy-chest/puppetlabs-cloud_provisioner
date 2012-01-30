@@ -101,7 +101,15 @@ module Puppet::CloudPack
       add_platform_option(action)
       add_region_option(action)
       add_availability_zone_option(action)
+      add_tags_option(action)
+      add_image_option(action)
+      add_type_option(action)
+      add_keyname_option(action)
+      add_subnet_option(action)
+      add_group_option(action)
+    end
 
+    def add_tags_option(action)
       action.option '--tags=', '-t=' do
         summary 'The tags the instance should have in format tag1=value1,tag2=value2'
         description <<-EOT
@@ -133,7 +141,9 @@ module Puppet::CloudPack
         end
 
       end
+    end
 
+    def add_image_option(action)
       action.option '--image=', '-i=' do
         summary 'AMI to use when creating the instance.'
         description <<-EOT
@@ -151,7 +161,9 @@ module Puppet::CloudPack
           end
         end
       end
+    end
 
+    def add_type_option(action)
       action.option '--type=' do
         summary 'Type of instance.'
         description <<-EOT
@@ -169,7 +181,9 @@ module Puppet::CloudPack
           end
         end
       end
+    end
 
+    def add_keyname_option(action)
       action.option '--keyname=' do
         summary 'The AWS SSH key name as shown in the AWS console. See the list_keynames action.'
         description <<-EOT
@@ -192,6 +206,9 @@ module Puppet::CloudPack
           end
         end
       end
+    end
+
+    def add_subnet_option(action)
       action.option '--subnet=', '-s='  do
         summary "The subnet in which to deploy the VM (VPC only)"
         description <<-EOT
@@ -199,7 +216,9 @@ module Puppet::CloudPack
            This feature is only available when using EC2's VPC feature.
         EOT
       end
+    end
 
+    def add_group_option(action)
       action.option '--group=', '-g=', '--security-group=' do
         summary "The instance's security group(s)."
         description <<-EOT
