@@ -635,6 +635,24 @@ describe Puppet::CloudPack do
         subject.send :create_connection, :platform => 'SomeProvider'
       end
 
+      it 'should create a connection with region when the provider is aws and region is set' do
+        Fog::Compute.expects(:new).with(:provider => 'AWS', :region => 'us-east-1', :endpoint => nil)
+        subject.send :create_connection, :platform => 'AWS', :region => 'us-east-1'
+      end
+
+      it 'should create a connection with region and endpoint when the provider is aws and region and endpoint are set' do
+        Fog::Compute.expects(:new).with(
+          :provider => 'AWS',
+          :region => 'us-east-1',
+          :endpoint => 'http://172.21.0.19:8773/services/Cloud'
+        )
+        subject.send(:create_connection,
+          :platform => 'AWS',
+          :region => 'us-east-1',
+          :endpoint => 'http://172.21.0.19:8773/services/Cloud'
+        )
+      end
+
       it 'should use auxiliary credentials' do
         Fog.expects(:credential=).with(:SomeCredential)
         Fog::Compute.expects(:new).with(:provider => 'SomeProvider')

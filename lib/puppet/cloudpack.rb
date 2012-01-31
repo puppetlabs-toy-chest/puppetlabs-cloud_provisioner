@@ -1035,7 +1035,12 @@ module Puppet::CloudPack
       Fog.credential = options[:credentials].to_sym if options[:credentials]
       case options[:platform]
       when 'AWS'
-        Fog::Compute.new(:provider => options[:platform], :region => options[:region])
+        # fog is smart emough to pass options to that are set to nil
+        Fog::Compute.new(
+          :provider => options[:platform],
+          :region => options[:region],
+          :endpoint => options[:endpoint]
+        )
       else
         Fog::Compute.new(:provider => options[:platform])
       end
