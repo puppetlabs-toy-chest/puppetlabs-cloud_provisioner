@@ -76,6 +76,17 @@ describe Puppet::CloudPack do
         end
       end
 
+      describe 'when tags are not supported' do
+        it 'should not add any tags' do
+          subject.create(
+            :platform => 'AWS',
+            :image => 'ami-12345',
+            :tags_not_supported => true
+          )
+          Fog::Compute.new(:provider => 'AWS').servers.last.tags.should == {}
+        end
+      end
+
       describe 'in exceptional situations' do
         before(:all) { @options = { :platform => 'AWS', :image => 'ami-12345' } }
 

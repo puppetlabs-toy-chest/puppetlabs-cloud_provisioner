@@ -657,12 +657,14 @@ module Puppet::CloudPack
         end
       end
 
-      tags = {'Created-By' => 'Puppet'}
-      tags.merge! options[:tags] if options[:tags]
+      unless (options[:tags_not_supported])
+        tags = {'Created-By' => 'Puppet'}
+        tags.merge! options[:tags] if options[:tags]
 
-      Puppet.notice('Creating tags for instance ... ')
-      create_tags(connection.tags, server.id, tags)
-      Puppet.notice('Creating tags for instance ... Done')
+        Puppet.notice('Creating tags for instance ... ')
+        create_tags(connection.tags, server.id, tags)
+        Puppet.notice('Creating tags for instance ... Done')
+      end
 
       Puppet.notice("Launching server #{server.id} ...")
       retries = 0
