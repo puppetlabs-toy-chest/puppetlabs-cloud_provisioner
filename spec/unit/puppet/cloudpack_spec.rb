@@ -127,6 +127,13 @@ describe Puppet::CloudPack do
 
           subject.terminate('some.name', { })
         end
+        it 'should use the specified terminate id when filtering for nodes to terminate' do
+          args = { 'instance-id' => 'some.name' }
+          @servers.expects(:all).with(args).returns([@server])
+          @server.expects(:destroy)
+
+          subject.terminate('some.name', { :terminate_id => 'instance-id' })
+        end
       end
     end
 

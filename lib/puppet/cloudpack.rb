@@ -1002,12 +1002,14 @@ module Puppet::CloudPack
       # JJM This isn't ideal, it would be better to set the default in the
       # option handling block, but I'm not sure how to do this.
       options = merge_default_options(options)
+      # set the default id used for termination to dns_name
+      options[:terminate_id] ||= 'dns-name'
 
       Puppet.info "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
       Puppet.info "Connecting to #{options[:platform]} ... Done"
 
-      servers = connection.servers.all('dns-name' => server)
+      servers = connection.servers.all(options[:terminate_id] => server)
       if servers.length == 1 || options[:force]
         # We're using myserver rather than server to prevent ruby 1.8 from
         # overwriting the server method argument
