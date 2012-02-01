@@ -55,9 +55,12 @@ describe Puppet::CloudPack do
   end
 
   describe 'actions' do
+
+    after(:each) { Fog::Compute::AWS::Mock.reset}
+
     describe '#create' do
       describe 'with valid arguments' do
-        before :all do
+        before :each do
           stub_console_output("pre\nec2: ####\nec2: PRINTS\nec2: ####\npost\n")
           @result = subject.create(:platform => 'AWS', :image => 'ami-12345')
           @server = Fog::Compute.new(:provider => 'AWS').servers.first
@@ -74,6 +77,7 @@ describe Puppet::CloudPack do
         it 'should return the dns name of the new instance' do
           @result.should == @server.dns_name
         end
+
       end
 
       describe 'when tags are not supported' do
@@ -83,7 +87,7 @@ describe Puppet::CloudPack do
             :image => 'ami-12345',
             :tags_not_supported => true
           )
-          Fog::Compute.new(:provider => 'AWS').servers.last.tags.should == {}
+          Fog::Compute.new(:provider => 'AWS').servers.first.tags.should == {}
         end
       end
 
@@ -150,7 +154,8 @@ describe Puppet::CloudPack do
 
     describe '#list' do
       describe 'with valid arguments' do
-        before :all do
+        before :each do
+          subject.create(:platform => 'AWS', :image => 'ami-12345')
           @result = subject.list(:platform => 'AWS')
         end
         it 'should not be empty' do
