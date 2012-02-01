@@ -245,6 +245,7 @@ describe Puppet::CloudPack do
       end
       it 'should pre-pend sudo to command if login is not root' do
         @options[:login] = 'dan'
+        @options[:install_script] = 'puppet-community'
         Puppet::CloudPack.expects(:ssh_connect).with(@server, 'dan', @keyfile.path).returns(@mock_connection_tuple)
         @is_command_valid = false
         @has_keyfile = true
@@ -263,6 +264,7 @@ describe Puppet::CloudPack do
       end
       it 'should not add sudo to command when login is root' do
         @options[:login] = 'root'
+        @options[:install_script] = 'puppet-community'
         Puppet::CloudPack.expects(:ssh_connect).with(@server, 'root', @keyfile.path).returns(@mock_connection_tuple)
         @is_command_valid = false
         Puppet::CloudPack.expects(:ssh_remote_execute).times(3).with do |server, login, command, keyfile|
@@ -622,22 +624,6 @@ describe Puppet::CloudPack do
         :install_script    => "puppet-enterprise-s3",
         :installer_answers => "/Users/jeff/vms/moduledev/enterprise/answers_cloudpack.txt",
       }
-    end
-
-    describe '#merge_default_options' do
-      it 'should set the installer script' do
-        merged_options = subject.merge_default_options(@options)
-        merged_options.should include(:install_script)
-      end
-      it 'should set the installer script to puppet-community when unset' do
-        (opts = @options.dup).delete(:install_script)
-        merged_options = subject.merge_default_options(opts)
-        merged_options[:install_script].should eq('puppet-community')
-      end
-      it 'should allow the user to specify the install script' do
-        merged_options = subject.merge_default_options(@options)
-        merged_options[:install_script].should eq(@options[:install_script])
-      end
     end
 
     describe '#create_connection' do
