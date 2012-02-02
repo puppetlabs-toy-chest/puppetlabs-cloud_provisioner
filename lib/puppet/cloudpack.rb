@@ -12,13 +12,6 @@ module Puppet::CloudPack
   require 'puppet/cloudpack/installer'
   class << self
 
-    # Method to set AWS defaults in a central place.  Lots of things need these
-    # defaults, so they all call merge_default_options() to ensure the keys are
-    # set.
-    def merge_default_options(options)
-      default_options = { :region => 'us-east-1', :platform => 'AWS', :install_script => 'puppet-community' }
-      default_options.merge(options)
-    end
     def add_availability_zone_option(action)
       action.option '--availability-zone=' do
         summary 'AWS availability zone.'
@@ -41,11 +34,10 @@ module Puppet::CloudPack
           Note: to use another region, you will need to copy your keypair and reconfigure the
           security groups to allow SSH access.
         EOT
+
+        default_to { 'us-east-1' }
+
         before_action do |action, args, options|
-          # JJM FIXME We shouldn't have to set the defaults here, but we do because the first
-          # required action may not have it's #before_action evaluated yet.  As a result,
-          # the default settings may not be evaluated.
-          options = Puppet::CloudPack.merge_default_options(options)
 
           regions_response = Puppet::CloudPack.create_connection(options).describe_regions
           region_names = regions_response.body["regionInfo"].collect { |r| r["regionName"] }.flatten
@@ -76,6 +68,9 @@ module Puppet::CloudPack
           The Cloud platform used to create new machine instances.
           Currently, AWS (Amazon Web Services) is the only supported platform.
         EOT
+
+        default_to { 'AWS' }
+
         before_action do |action, args, options|
           supported_platforms = [ 'AWS' ]
           unless supported_platforms.include?(options[:platform])
@@ -88,7 +83,6 @@ module Puppet::CloudPack
     # JJM This method is separated from the before_action block to aid testing.
     def group_option_before_action(options)
       options[:group] = options[:group].split(File::PATH_SEPARATOR) unless options[:group].is_a? Array
-      options = Puppet::CloudPack.merge_default_options(options)
 
       known = Puppet::CloudPack.create_connection(options).security_groups
       unknown = options[:group].select { |g| known.get(g).nil? }
@@ -101,7 +95,15 @@ module Puppet::CloudPack
       add_platform_option(action)
       add_region_option(action)
       add_availability_zone_option(action)
+      add_tags_option(action)
+      add_image_option(action)
+      add_type_option(action)
+      add_keyname_option(action)
+      add_subnet_option(action)
+      add_group_option(action)
+    end
 
+    def add_tags_option(action)
       action.option '--tags=', '-t=' do
         summary 'The tags the instance should have in format tag1=value1,tag2=value2'
         description <<-EOT
@@ -133,7 +135,9 @@ module Puppet::CloudPack
         end
 
       end
+    end
 
+    def add_image_option(action)
       action.option '--image=', '-i=' do
         summary 'AMI to use when creating the instance.'
         description <<-EOT
@@ -143,15 +147,14 @@ module Puppet::CloudPack
         EOT
         required
         before_action do |action, args, options|
-          # We add these options because it's required in Fog but optional for Cloud Pack
-          # It doesn't feel right to do this here, but I don't know another way yet.
-          options = Puppet::CloudPack.merge_default_options(options)
           if Puppet::CloudPack.create_connection(options).images.get(options[:image]).nil?
             raise ArgumentError, "Unrecognized image name: #{options[:image]}"
           end
         end
       end
+    end
 
+    def add_type_option(action)
       action.option '--type=' do
         summary 'Type of instance.'
         description <<-EOT
@@ -169,7 +172,9 @@ module Puppet::CloudPack
           end
         end
       end
+    end
 
+    def add_keyname_option(action)
       action.option '--keyname=' do
         summary 'The AWS SSH key name as shown in the AWS console. See the list_keynames action.'
         description <<-EOT
@@ -184,14 +189,14 @@ module Puppet::CloudPack
         EOT
         required
         before_action do |action, args, options|
-          # We add this option because it's required in Fog but optional for Cloud Pack
-          # It doesn't feel right to do this here, but I don't know another way yet.
-          options = Puppet::CloudPack.merge_default_options(options)
           if Puppet::CloudPack.create_connection(options).key_pairs.get(options[:keyname]).nil?
             raise ArgumentError, "Unrecognized key name: #{options[:keyname]} (Suggestion: use the puppet node_aws list_keynames action to find a list of valid key names for your account.)"
           end
         end
       end
+    end
+
+    def add_subnet_option(action)
       action.option '--subnet=', '-s='  do
         summary "The subnet in which to deploy the VM (VPC only)"
         description <<-EOT
@@ -199,7 +204,9 @@ module Puppet::CloudPack
            This feature is only available when using EC2's VPC feature.
         EOT
       end
+    end
 
+    def add_group_option(action)
       action.option '--group=', '-g=', '--security-group=' do
         summary "The instance's security group(s)."
         description <<-EOT
@@ -236,8 +243,8 @@ module Puppet::CloudPack
     end
 
     def add_terminate_options(action)
-      add_region_option(action)
       add_platform_option(action)
+      add_region_option(action)
       action.option '--force', '-f' do
         summary 'Forces termination of an instance.'
       end
@@ -403,6 +410,7 @@ module Puppet::CloudPack
           Name of the installation template to use when installing Puppet. The current
           list of supported templates is: gems, puppet-enterprise
         EOT
+        default_to { 'puppet-community' }
       end
 
       action.option '--puppet-version=' do
@@ -607,7 +615,6 @@ module Puppet::CloudPack
     end
 
     def create(options)
-      options = merge_default_options(options)
       unless options.has_key? :_destroy_server_at_exit
         options[:_destroy_server_at_exit] = :create
       end
@@ -638,12 +645,14 @@ module Puppet::CloudPack
         end
       end
 
-      tags = {'Created-By' => 'Puppet'}
-      tags.merge! options[:tags] if options[:tags]
+      unless (options[:tags_not_supported])
+        tags = {'Created-By' => 'Puppet'}
+        tags.merge! options[:tags] if options[:tags]
 
-      Puppet.notice('Creating tags for instance ... ')
-      create_tags(connection.tags, server.id, tags)
-      Puppet.notice('Creating tags for instance ... Done')
+        Puppet.notice('Creating tags for instance ... ')
+        create_tags(connection.tags, server.id, tags)
+        Puppet.notice('Creating tags for instance ... Done')
+      end
 
       Puppet.notice("Launching server #{server.id} ...")
       retries = 0
@@ -672,7 +681,6 @@ module Puppet::CloudPack
     end
 
     def list_keynames(options = {})
-      options = merge_default_options(options)
       connection = create_connection(options)
       keys_array = connection.key_pairs.collect do |key|
         key.attributes.inject({}) { |memo,(k,v)| memo[k.to_s] = v; memo }
@@ -688,7 +696,6 @@ module Puppet::CloudPack
     end
 
     def list(options)
-      options = merge_default_options(options)
       connection = create_connection(options)
       servers = connection.servers
       # Convert the Fog object into a simple hash.
@@ -708,7 +715,6 @@ module Puppet::CloudPack
     end
 
     def fingerprint(server, options)
-      options = merge_default_options(options)
       connection = create_connection(options)
       servers = connection.servers.all('dns-name' => server)
 
@@ -779,7 +785,6 @@ module Puppet::CloudPack
     end
 
     def install(server, options)
-      options = merge_default_options(options)
 
       # If the end user wants to use their agent, we need to set keyfile to nil
       if options[:keyfile] == 'agent' then
@@ -930,7 +935,6 @@ module Puppet::CloudPack
     end
 
     def upload_payloads(scp, options)
-      options = merge_default_options(options)
 
       if options[:install_script] == 'puppet-enterprise'
         unless options[:installer_payload] and options[:installer_answers]
@@ -960,7 +964,6 @@ module Puppet::CloudPack
 
     def compile_template(options)
       Puppet.notice "Installing Puppet ..."
-      options = merge_default_options(options)
       options[:server] = Puppet[:server]
       options[:environment] = Puppet[:environment] || 'production'
 
@@ -980,15 +983,14 @@ module Puppet::CloudPack
     end
 
     def terminate(server, options)
-      # JJM This isn't ideal, it would be better to set the default in the
-      # option handling block, but I'm not sure how to do this.
-      options = merge_default_options(options)
+      # set the default id used for termination to dns_name
+      options[:terminate_id] ||= 'dns-name'
 
       Puppet.info "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
       Puppet.info "Connecting to #{options[:platform]} ... Done"
 
-      servers = connection.servers.all('dns-name' => server)
+      servers = connection.servers.all(options[:terminate_id] => server)
       if servers.length == 1 || options[:force]
         # We're using myserver rather than server to prevent ruby 1.8 from
         # overwriting the server method argument
@@ -1014,7 +1016,12 @@ module Puppet::CloudPack
       Fog.credential = options[:credentials].to_sym if options[:credentials]
       case options[:platform]
       when 'AWS'
-        Fog::Compute.new(:provider => options[:platform], :region => options[:region])
+        # fog is smart emough to pass options to that are set to nil
+        Fog::Compute.new(
+          :provider => options[:platform],
+          :region => options[:region],
+          :endpoint => options[:endpoint]
+        )
       else
         Fog::Compute.new(:provider => options[:platform])
       end

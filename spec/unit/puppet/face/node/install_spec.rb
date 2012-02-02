@@ -52,6 +52,21 @@ describe Puppet::Face[:node, :current] do
       end
     end
 
+    describe '(install-script)' do
+      it 'should default to community-edition' do
+        Puppet::CloudPack.expects(:install).with do |server, options|
+          options[:install_script] == 'puppet-community'
+        end
+        subject.install('server', @options)
+      end
+      it 'should be possible to set install-script' do
+        Puppet::CloudPack.expects(:install).with do |server, options|
+          options[:install_script] == 'puppet-enterprise'
+        end
+        subject.install('server', @options.merge(:install_script => 'puppet-enterprise'))
+      end
+    end
+
     describe '(facts)' do
       let(:facts_hash) do { 'fact1' => 'value1', 'fact2' => 'value2', 'fact3' => 'value3.1=value3.2' }; end
 
