@@ -9,6 +9,8 @@ require 'puppet/cloudpack/utils'
 require 'timeout'
 
 module Puppet::CloudPack
+  class InstanceErrorState < Exception
+  end
   require 'puppet/cloudpack/installer'
   class << self
 
@@ -659,10 +661,16 @@ module Puppet::CloudPack
       begin
         server.wait_for do
           print '#'
+          raise Puppet::CloudPack::InstanceErrorState if self.state == 'error'
           self.ready?
         end
         puts
         Puppet.notice("Server #{server.id} is now launched")
+      rescue Puppet::CloudPack::InstanceErrorState
+        puts
+        Puppet.err "Launching machine instance #{server.id} Failed."
+        Puppet.err "Instance has entered an error state"
+        return nil
       rescue Fog::Errors::Error
         Puppet.err "Launching server #{server.id} Failed."
         Puppet.err "Could not connect to host"
