@@ -548,7 +548,7 @@ describe Puppet::CloudPack do
           {}
         )
       end
-      it 'should upload answer file when specified' do
+      it 'should upload answers file when specified' do
         @scp_mock.expects(:upload).with('foo', "/tmp/puppet.answers")
         @result = subject.upload_payloads(
           @scp_mock,
