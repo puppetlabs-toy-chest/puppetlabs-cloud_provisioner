@@ -23,8 +23,8 @@ grep -v '^q_puppetagent_certname' puppet.answers.orig > puppet.answers
 # Append the user specified option from the command line arguments.
 echo 'q_puppetagent_certname=<%= options[:puppetagent_certname] %>' >> puppet.answers
 <% else %>
-#If we have a certname specified in the answer file, use it
-if ! grep '^q_puppetagent_certname' puppet.answer; then
+#If we have a certname specified in the answers file, use it
+if ! grep '^q_puppetagent_certname' puppet.answers; then
   echo 'q_puppetagent_certname=<%= options[:puppetagent_certname] %>' >> puppet.answers
 fi
 <% end %>

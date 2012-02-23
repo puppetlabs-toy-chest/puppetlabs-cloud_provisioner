@@ -942,7 +942,7 @@ module Puppet::CloudPack
         end
       end
 
-      # Puppet enterprise install scripts, even those using S3, need and installer answer file.
+      # Puppet enterprise install scripts, even those using S3, need and installer answers file.
       if options[:install_script] =~ /^puppet-enterprise-/
         unless options[:installer_answers]
           raise "Must specify an answers file for install script #{options[:install_script]}"
