@@ -6,7 +6,7 @@ Puppet::Face.define :node, '0.0.1' do
     description <<-EOT
       Installs Puppet on an existing node at <hostname_or_ip>. It uses scp to
       copy installation requirements to the machine, and ssh to run the
-      installation commmands remotely.
+      installation commands remotely.
 
       This action can be used on both physical and virtual machines.
     EOT
