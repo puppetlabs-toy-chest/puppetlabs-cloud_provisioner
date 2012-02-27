@@ -117,6 +117,23 @@ describe Puppet::CloudPack do
             subject.should be_nil
           end
         end
+        describe 'like when the created instance is in an error state' do
+          before :each do
+            server do |server|
+              server.stubs(:state).returns('error')
+            end
+          end
+
+          it 'should explain what went wrong' do
+            subject
+            @logs.join.should match /Launching machine instance \S+ Failed/
+            @logs.join.should match /Instance has entered an error state/
+          end
+
+          it 'should return nil' do
+            subject.should be_nil
+          end
+        end
       end
     end
 
