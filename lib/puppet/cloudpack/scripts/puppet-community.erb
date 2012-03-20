@@ -5,16 +5,31 @@
 set -u
 set -e
 
-function rpm_install(){
-  # Setup the yum Puppet repository
+function fedora_repo() {
   cat >/etc/yum.repos.d/puppet.repo <<'EOFYUMREPO'
 [puppetlabs]
-name = Puppetlbas
-baseurl = http://yum.puppetlabs.com/el/$releasever/products/$basearch/ 
+name = Puppetlabs
+baseurl = http://yum.puppetlabs.com/fedora/f$releasever/products/$basearch/
 gpgcheck = 1
 enabled = 1
 gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
 EOFYUMREPO
+}
+
+function el_repo() {
+  cat >/etc/yum.repos.d/puppet.repo <<'EOFYUMREPO'
+[puppetlabs]
+name = Puppetlabs
+baseurl = http://yum.puppetlabs.com/el/$releasever/products/$basearch/
+gpgcheck = 1
+enabled = 1
+gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
+EOFYUMREPO
+}
+
+function rpm_install() {
+  # Setup the yum Puppet repository
+  rpm -q fedora-release && fedora_repo || el_repo
 
   # Install Puppet from yum.puppetlabs.com
   yum install -y puppet
@@ -23,19 +38,19 @@ EOFYUMREPO
 function apt_install() {
   # Download and install the puppetlabs apt public
   apt-key adv --recv-key --keyserver pool.sks-keyservers.net 4BD6EC30
-  
+
   # We need to grab the distro and release in order to populate
   # the apt repo details. We are assuming that the lsb_release command
   # will be available as even puppet evens has it (lsb_base) package as
   # dependancy.
-  
+
   # Since puppet requires lsb-release I believe this is ok to use for
   # the purpose of distro and release discovery.
   apt-get update
   apt-get -y install lsb-release
   distro=$(lsb_release -i | cut -f 2 | tr "[:upper:]" "[:lower:]")
   release=$(lsb_release -c | cut -f 2)
-  
+
   # Setup the apt Puppet repository
   cat > /etc/apt/sources.list.d/puppetlabs.list <<EOFAPTREPO
 deb http://apt.puppetlabs.com/${distro}/ ${release} main
@@ -46,7 +61,7 @@ EOFAPTREPO
 }
 
 function install_puppet() {
-  case ${breed} in 
+  case ${breed} in
     "redhat")
       rpm_install ;;
     "debian")
@@ -111,7 +126,7 @@ function provision_puppet() {
     echo "This OS is not supported by Puppet Cloud Provisioner"
     exit 1
   fi
-  
+
   install_puppet
   configure_puppet
   <%= 'facts_dot_d' if options[:facts] %>
