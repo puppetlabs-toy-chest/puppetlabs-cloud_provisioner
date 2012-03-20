@@ -32,7 +32,7 @@ grep -v '^q_puppetagent_certname' puppet.answers.orig > puppet.answers
 # Append the user specified option from the command line arguments.
 echo 'q_puppetagent_certname=<%= options[:puppetagent_certname] %>' >> puppet.answers
 <% else %>
-#If we have a certname specified in the answer file, use it
+#If we have a certname specified in the answers file, use it
 if ! grep '^q_puppetagent_certname' puppet.answers; then
   echo 'q_puppetagent_certname=<%= options[:puppetagent_certname] %>' >> puppet.answers
 fi
@@ -58,8 +58,17 @@ $http_get '<%= options[:installer_payload] %>' | \
 # REVISIT (This assumes GNU tar with the --strip-components option)
 echo "Uncompressing the payload ... Done."
 
-# Finally, actually install Puppet Enterprise
+# Install Puppet Enterprise
 "${install_dir}"/puppet-enterprise-installer -a puppet.answers 2>&1 | tee install.log
+
+# Finally, set up any custom facts if necessary
+mkdir -p /etc/puppetlabs/facter/facts.d
+<% if options[:facts] %>
+echo "Installing custom facts"
+<% options[:facts].each do |fact,value| %>
+echo <%= fact %>=<%= value %> > /etc/puppetlabs/facter/facts.d/<%= fact %>.txt
+<% end %>
+<% end %>
 
 # And then kick off a puppet agent run
 /opt/puppet/bin/puppet agent --daemonize \

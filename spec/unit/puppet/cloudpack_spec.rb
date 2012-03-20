@@ -55,9 +55,12 @@ describe Puppet::CloudPack do
   end
 
   describe 'actions' do
+
+    after(:each) { Fog::Compute::AWS::Mock.reset}
+
     describe '#create' do
       describe 'with valid arguments' do
-        before :all do
+        before :each do
           stub_console_output("pre\nec2: ####\nec2: PRINTS\nec2: ####\npost\n")
           @result = subject.create(:platform => 'AWS', :image => 'ami-12345')
           @server = Fog::Compute.new(:provider => 'AWS').servers.first
@@ -73,6 +76,18 @@ describe Puppet::CloudPack do
 
         it 'should return the dns name of the new instance' do
           @result.should == @server.dns_name
+        end
+
+      end
+
+      describe 'when tags are not supported' do
+        it 'should not add any tags' do
+          subject.create(
+            :platform => 'AWS',
+            :image => 'ami-12345',
+            :tags_not_supported => true
+          )
+          Fog::Compute.new(:provider => 'AWS').servers.first.tags.should == {}
         end
       end
 
@@ -102,6 +117,23 @@ describe Puppet::CloudPack do
             subject.should be_nil
           end
         end
+        describe 'like when the created instance is in an error state' do
+          before :each do
+            server do |server|
+              server.stubs(:state).returns('error')
+            end
+          end
+
+          it 'should explain what went wrong' do
+            subject
+            @logs.join.should match /Launching machine instance \S+ Failed/
+            @logs.join.should match /Instance has entered an error state/
+          end
+
+          it 'should return nil' do
+            subject.should be_nil
+          end
+        end
       end
     end
 
@@ -127,12 +159,20 @@ describe Puppet::CloudPack do
 
           subject.terminate('some.name', { })
         end
+        it 'should use the specified terminate id when filtering for nodes to terminate' do
+          args = { 'instance-id' => 'some.name' }
+          @servers.expects(:all).with(args).returns([@server])
+          @server.expects(:destroy)
+
+          subject.terminate('some.name', { :terminate_id => 'instance-id' })
+        end
       end
     end
 
     describe '#list' do
       describe 'with valid arguments' do
-        before :all do
+        before :each do
+          subject.create(:platform => 'AWS', :image => 'ami-12345')
           @result = subject.list(:platform => 'AWS')
         end
         it 'should not be empty' do
@@ -227,6 +267,7 @@ describe Puppet::CloudPack do
       end
       it 'should pre-pend sudo to command if login is not root' do
         @options[:login] = 'dan'
+        @options[:install_script] = 'puppet-community'
         Puppet::CloudPack.expects(:ssh_connect).with(@server, 'dan', @keyfile.path).returns(@mock_connection_tuple)
         @is_command_valid = false
         @has_keyfile = true
@@ -245,6 +286,7 @@ describe Puppet::CloudPack do
       end
       it 'should not add sudo to command when login is root' do
         @options[:login] = 'root'
+        @options[:install_script] = 'puppet-community'
         Puppet::CloudPack.expects(:ssh_connect).with(@server, 'root', @keyfile.path).returns(@mock_connection_tuple)
         @is_command_valid = false
         Puppet::CloudPack.expects(:ssh_remote_execute).times(3).with do |server, login, command, keyfile|
@@ -523,7 +565,7 @@ describe Puppet::CloudPack do
           {}
         )
       end
-      it 'should upload answer file when specified' do
+      it 'should upload answers file when specified' do
         @scp_mock.expects(:upload).with('foo', "/tmp/puppet.answers")
         @result = subject.upload_payloads(
           @scp_mock,
@@ -606,26 +648,36 @@ describe Puppet::CloudPack do
       }
     end
 
-    describe '#merge_default_options' do
-      it 'should set the installer script' do
-        merged_options = subject.merge_default_options(@options)
-        merged_options.should include(:install_script)
-      end
-      it 'should set the installer script to puppet-community when unset' do
-        (opts = @options.dup).delete(:install_script)
-        merged_options = subject.merge_default_options(opts)
-        merged_options[:install_script].should eq('puppet-community')
-      end
-      it 'should allow the user to specify the install script' do
-        merged_options = subject.merge_default_options(@options)
-        merged_options[:install_script].should eq(@options[:install_script])
-      end
-    end
-
     describe '#create_connection' do
       it 'should create a new connection' do
         Fog::Compute.expects(:new).with(:provider => 'SomeProvider')
         subject.send :create_connection, :platform => 'SomeProvider'
+      end
+
+      it 'should create a connection with region when the provider is aws and region is set' do
+        Fog::Compute.expects(:new).with(:provider => 'AWS', :region => 'us-east-1', :endpoint => nil)
+        subject.send :create_connection, :platform => 'AWS', :region => 'us-east-1'
+      end
+
+      it 'should create a connection with region and endpoint when the provider is aws and region and endpoint are set' do
+        Fog::Compute.expects(:new).with(
+          :provider => 'AWS',
+          :region => 'us-east-1',
+          :endpoint => 'http://172.21.0.19:8773/services/Cloud'
+        )
+        subject.send(:create_connection,
+          :platform => 'AWS',
+          :region => 'us-east-1',
+          :endpoint => 'http://172.21.0.19:8773/services/Cloud'
+        )
+      end
+
+      it 'should use auxiliary credentials' do
+        Fog.expects(:credential=).with(:SomeCredential)
+        Fog::Compute.expects(:new).with(:provider => 'SomeProvider')
+        subject.send :create_connection,
+          :platform    => 'SomeProvider',
+          :credentials => 'SomeCredential'
       end
     end
 
@@ -646,7 +698,7 @@ describe Puppet::CloudPack do
             :resource_id => 'i-1234'
           )
         end
-        subject.send :create_tags, tags, mock(:id => 'i-1234')
+        subject.send :create_tags, tags, 'i-1234', {'Created-By' => 'Puppet'}
       end
     end
 

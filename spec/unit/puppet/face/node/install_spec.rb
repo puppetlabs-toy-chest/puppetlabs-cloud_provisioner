@@ -11,7 +11,8 @@ describe Puppet::Face[:node, :current] do
       :login             => 'ubuntu',
       :keyfile           => @keyfile.path,
       :installer_payload => @installer_payload.path,
-      :installer_answers => @installer_answers.path
+      :installer_answers => @installer_answers.path,
+      :facts             => 'fact1=value1,fact2=value2,fact3=value3.1=value3.2'
     }
     ENV['SSH_AUTH_SOCK'] = '/tmp/foo.socket'
   end
@@ -48,6 +49,37 @@ describe Puppet::Face[:node, :current] do
       it 'should validate the keyfile name for readability' do
         File.chmod 0300, @options[:keyfile]
         expect { subject.install('server', @options) }.to raise_error ArgumentError, /could not read/i
+      end
+    end
+
+    describe '(install-script)' do
+      it 'should default to community-edition' do
+        Puppet::CloudPack.expects(:install).with do |server, options|
+          options[:install_script] == 'puppet-community'
+        end
+        subject.install('server', @options)
+      end
+      it 'should be possible to set install-script' do
+        Puppet::CloudPack.expects(:install).with do |server, options|
+          options[:install_script] == 'puppet-enterprise'
+        end
+        subject.install('server', @options.merge(:install_script => 'puppet-enterprise'))
+      end
+    end
+
+    describe '(facts)' do
+      let(:facts_hash) do { 'fact1' => 'value1', 'fact2' => 'value2', 'fact3' => 'value3.1=value3.2' }; end
+
+      it 'should produce a hash correctly' do
+        Puppet::CloudPack.expects(:install).with do |server,options|
+          options[:facts] == facts_hash
+        end
+        subject.install('server', @options)
+      end
+
+      it 'should exit on improper value' do
+        @options[:facts] = 'fact1=value1,fact2=val,ue2,fact3=value3.1=value3.2'
+        expect { subject.install('server', @options) }.to raise_error ArgumentError, /could not parse/i 
       end
     end
 
