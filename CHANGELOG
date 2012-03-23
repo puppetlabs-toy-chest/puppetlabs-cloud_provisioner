@@ -1,5 +1,21 @@
-1.0.2
-===
+Fri Mar 23 2012 Michael Stahnke <stahnma@puppetlabs.com> - v1.0.2
+(#13095) Add fedora support to puppet-community.
+(#12717) Don't append to answers file if puppet agent certname already present
+(#12499) Watch for error states during instance creation
+(#12352) Reset Fog::Compute::AWS::Mock objects
+(#7220) Refactor to use default_to for option defaults
+(#12229) Make setting Created-By tag optional
+(#12228) Add endpoint option to creation of fog compute
+(#12267) Make filter for termination configurable
+(#12225) Define connection options in their own methods
+(#11324 and #11323) Properly validate tags and facts input
+(#11304) Add custom tag support
+(#10235) Add keyname to list of attributes
+(#10971) Adding --facts options for install action
+(#10871) Added spec test for Fog credentials
+(#11015) Retry on failed auth for slow provisions
+(#10871) Allow alternate fog credentials
+(#10189) Add AWS availability zone option -- Adds the ability to create instances in specific AWS availability zones within a region
 
 Mon Nov 07 2011 Michael Stahnke <stahnma@puppetlabs.com> - v1.0.0
 (#10197) Add HTTP authentication to classify action
