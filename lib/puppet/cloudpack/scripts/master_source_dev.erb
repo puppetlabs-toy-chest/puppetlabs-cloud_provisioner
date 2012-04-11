@@ -11,7 +11,7 @@ if [ -f /etc/redhat-release ]; then
   cat >/etc/yum.repos.d/epel.repo <<EOF
 [prosvc]
 name=Puppet Labs PS (Unofficial)
-baseurl=http://yum.puppetlabs.com/el/\$releasever/dependencies/\$basearch 
+baseurl=http://yum.puppetlabs.com/el/\$releasever/dependencies/\$basearch
 enabled=1
 gpgkey=http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
 gpgcheck=1
