@@ -32,7 +32,7 @@ function rpm_install() {
   rpm -q fedora-release && fedora_repo || el_repo
 
   # Install Puppet from yum.puppetlabs.com
-  yum install -y puppet
+  yum install -y puppet<% if options[:puppet_version] %>-<%= options[:puppet_version] %><% end %>
 }
 
 function apt_install() {
