@@ -1,3 +1,8 @@
+2012-04-11 - Loren A. Linden Levy <lindenle@gmail.com> - 1.0.4
+ * need dependencies now too (3ceea56)
+ * need puppet version in community template (37add07)
+ * changed repo location see http://yum.puppetlabs.com/base/README.txt (796646f)
+
 Fri Apr 20 2012 Jeff McCune <jeff@puppetlabs.com> - 1.0.3
 (maint) Fix Module metadata.  The name is cloud_provisioner not cloud-provisioner
 
