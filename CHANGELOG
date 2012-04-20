@@ -1,3 +1,6 @@
+Fri Apr 20 2012 Jeff McCune <jeff@puppetlabs.com> - 1.0.3
+(maint) Fix Module metadata.  The name is cloud_provisioner not cloud-provisioner
+
 Fri Mar 23 2012 Michael Stahnke <stahnma@puppetlabs.com> - v1.0.2
 (#13095) Add fedora support to puppet-community.
 (#12717) Don't append to answers file if puppet agent certname already present
