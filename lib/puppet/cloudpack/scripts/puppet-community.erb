@@ -24,6 +24,12 @@ baseurl = http://yum.puppetlabs.com/el/$releasever/products/$basearch/
 gpgcheck = 1
 enabled = 1
 gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
+[puppetlabs-deps]
+name = Puppetlabs Dependencies
+baseurl = http://yum.puppetlabs.com/el/$releasever/dependencies/$basearch/
+gpgcheck = 1
+enabled = 1
+gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
 EOFYUMREPO
 }
 
@@ -32,7 +38,7 @@ function rpm_install() {
   rpm -q fedora-release && fedora_repo || el_repo
 
   # Install Puppet from yum.puppetlabs.com
-  yum install -y puppet
+  yum install -y puppet<% if options[:puppet_version] %>-<%= options[:puppet_version] %><% end %>
 }
 
 function apt_install() {
