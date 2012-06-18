@@ -6,3 +6,5 @@ license 'Apache Version 2.0'
 summary 'Puppet Cloud Provisioner'
 description 'Faces application to launch and manage Amazon EC2 instances'
 project_page 'https://projects.puppetlabs.com/projects/cloud-pack'
+
+dependency 'ripienaar/concat', '>= 0.1.0'
