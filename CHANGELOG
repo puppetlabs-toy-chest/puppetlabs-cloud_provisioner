@@ -1,3 +1,7 @@
+Wed Jul 19 2012 Moses Mendoza 1.0.5
+ * Update apt repository location.
+ * (#13913) removing out of date content
+
 2012-04-11 - Loren A. Linden Levy <lindenle@gmail.com> - 1.0.4
  * need dependencies now too (3ceea56)
  * need puppet version in community template (37add07)
