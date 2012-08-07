@@ -121,7 +121,7 @@ module Puppet::CloudPack
           ## A regex is needed that will allow us to escape ',' characters
           ## from the CLI
           begin
-            options[:tags] = Hash[ options[:tags].split(',').map do |tag| 
+            options[:tags] = Hash[ options[:tags].split(',').map do |tag|
               tag_array = tag.split('=',2)
               if tag_array.size != 2
                 raise ArgumentError, 'Could not parse tags given. Please check your format'
@@ -250,6 +250,10 @@ module Puppet::CloudPack
       action.option '--force', '-f' do
         summary 'Forces termination of an instance.'
       end
+      action.option '--id' do
+        summary 'The server ID given is an instance ID instead of a DNS name'
+        default_to { nil }
+      end
     end
 
     def add_bootstrap_options(action)
@@ -262,7 +266,7 @@ module Puppet::CloudPack
         summary 'Set custom facts in format of fact1=value,fact2=value'
         description <<-'EOT'
           To install custom facts during install of a node, use the format
-          fact1=value,fact2=value. Currently, there is no way to escape 
+          fact1=value,fact2=value. Currently, there is no way to escape
           the ',' character so facts cannot contain this character.
 
           Requirements:
@@ -282,7 +286,7 @@ module Puppet::CloudPack
           ## A regex is needed that will allow us to escape ',' characters
           ## from the CLI
           begin
-            options[:facts] = Hash[ options[:facts].split(',').map do |fact| 
+            options[:facts] = Hash[ options[:facts].split(',').map do |fact|
               fact_array = fact.split('=',2)
               if fact_array.size != 2
                 raise ArgumentError, 'Could not parse facts given. Please check your format'
@@ -991,8 +995,7 @@ module Puppet::CloudPack
     end
 
     def terminate(server, options)
-      # set the default id used for termination to dns_name
-      options[:terminate_id] ||= 'dns-name'
+      options[:terminate_id] ||= options[:id] ? 'instance-id' : 'dns-name'
 
       Puppet.info "Connecting to #{options[:platform]} ..."
       connection = create_connection(options)
@@ -1008,9 +1011,20 @@ module Puppet::CloudPack
           Puppet.notice "Destroying #{myserver.id} (#{myserver.dns_name}) ... Done"
         end
       elsif servers.empty?
-        Puppet.warning "Could not find server with DNS name '#{server}'"
+        message = if options[:id]
+                    "Could not find server with instance ID '#{server}'"
+                  else
+                    "Could not find server with DNS name '#{server}'"
+                  end
+        Puppet.warning message
       else
-        Puppet.err "More than one server with DNS name '#{server}'; aborting"
+        message = if options[:id]
+                    "More than one server with instance ID '#{server}'; aborting"
+                  else
+                    "More than one server with DNS name '#{server}'; aborting"
+                  end
+
+        Puppet.err message
       end
 
       return nil
