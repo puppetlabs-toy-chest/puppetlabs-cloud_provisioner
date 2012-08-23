@@ -26,10 +26,12 @@ module Puppet::CloudPack::Utils
 
       raise RetryException::Timeout if timedout?(start, parameters[:timeout])
 
-      if (not parameters[:retry_exceptions].keys.empty?) and parameters[:retry_exceptions].keys.include?(e.class)
+      retry_exceptions = parameters[:retry_exceptions].keys
+
+      if (not retry_exceptions.empty?) and (retry_exceptions.include?(e.class) or retry_exceptions.include?(e.class.to_s.to_sym))
         Puppet.info("Caught exception #{e.class}:#{e}")
         Puppet.info(parameters[:retry_exceptions][e.class])
-      elsif (not parameters[:retry_exceptions].keys.empty?)
+      elsif (not retry_exceptions.empty?)
         # If the exceptions is not in the list of retry_exceptions re-raise.
         raise e
       end
