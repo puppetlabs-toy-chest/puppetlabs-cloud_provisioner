@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'puppet/cloudpack'
 require 'puppet/cloudpack/utils'
 
 
@@ -15,8 +16,7 @@ describe Puppet::CloudPack::Utils do
     
     context "when a timeout and no retry_exceptions are given" do
       it "should require a block" do
-        expect {Puppet::CloudPack::Utils.retry_action(:timeout => 0.1)}.to
-        raise_error(Puppet::CloudPack::Utils::RetryException::NoBlockGiven)
+        expect {Puppet::CloudPack::Utils.retry_action(:timeout => 0.1)}.to raise_error(Puppet::CloudPack::Utils::RetryException::NoBlockGiven)
       end
       
        it "should timeout" do
@@ -40,7 +40,7 @@ describe Puppet::CloudPack::Utils do
 
     context "when an exception list and a timeout is given" do
       it "should retry the action for a time period no shorter than the timeout" do
-        timeout = 5
+        timeout = 2
         expect do
           Puppet::CloudPack::Utils.retry_action(
             :timeout          => timeout,
@@ -53,7 +53,7 @@ describe Puppet::CloudPack::Utils do
       end
       
       it "should retry the action for a time period no longer than the timeout plus action run time" do
-        timeout = 5
+        timeout = 2
         expect do
           Puppet::CloudPack::Utils.retry_action(
             :timeout          => timeout,
@@ -70,8 +70,7 @@ describe Puppet::CloudPack::Utils do
     
     context "when no arguments are given" do
       it "should require a block" do
-        expect {Puppet::CloudPack::Utils.retry_action}.to
-        raise_error(Puppet::CloudPack::Utils::RetryException::NoBlockGiven)
+        expect {Puppet::CloudPack::Utils.retry_action}.to raise_error(Puppet::CloudPack::Utils::RetryException::NoBlockGiven)
       end
     
       it "should require a timeout" do
