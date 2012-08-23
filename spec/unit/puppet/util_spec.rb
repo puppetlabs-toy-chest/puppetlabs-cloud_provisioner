@@ -80,6 +80,20 @@ describe Puppet::CloudPack::Utils do
           end
         end.to raise_error(Puppet::CloudPack::Utils::RetryException::Timeout)
       end
+
+      it "should accept a list of exception class names as strings" do
+        timeout = 2
+
+        exceptions = {
+          'ArgumentError' => 'Wrong number of arguments.'
+        }
+
+        expect do
+          Puppet::CloudPack::Utils.retry_action(:timeout => timeout, :retry_exceptions => exceptions) do
+            raise ArgumentError
+          end
+        end.to raise_error(Puppet::CloudPack::Utils::RetryException::Timeout)
+      end
     end
     
     context "when no arguments are given" do

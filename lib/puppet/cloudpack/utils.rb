@@ -28,7 +28,9 @@ module Puppet::CloudPack::Utils
 
       retry_exceptions = parameters[:retry_exceptions].keys
 
-      if (not retry_exceptions.empty?) and (retry_exceptions.include?(e.class) or retry_exceptions.include?(e.class.to_s.to_sym))
+      if (not retry_exceptions.empty?) and (retry_exceptions.include?(e.class) \
+                                            or retry_exceptions.include?(e.class.to_s) \
+                                            or retry_exceptions.include?(e.class.to_s.to_sym))
         Puppet.info("Caught exception #{e.class}:#{e}")
         Puppet.info(parameters[:retry_exceptions][e.class])
       elsif (not retry_exceptions.empty?)
