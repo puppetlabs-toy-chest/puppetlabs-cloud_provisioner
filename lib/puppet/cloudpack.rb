@@ -106,7 +106,7 @@ module Puppet::CloudPack
     end
 
     def add_tags_option(action)
-      action.option '--tags=', '-t=' do
+      action.option '--inst_tags=', '-t=' do
         summary 'The tags the instance should have in format tag1=value1,tag2=value2'
         description <<-EOT
           Instances may be tagged with custom tags. The tags should be in the
@@ -209,7 +209,7 @@ module Puppet::CloudPack
     end
 
     def add_group_option(action)
-      action.option '--group=', '-g=', '--security-group=' do
+      action.option '--sec-group=', '-g=', '--security-group=' do
         summary "The instance's security group(s)."
         description <<-EOT
           The security group(s) that the machine will be associated with. A
