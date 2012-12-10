@@ -545,6 +545,12 @@ describe Puppet::CloudPack do
             expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.should raise_error(Puppet::CloudPack::Utils::RetryException::Timeout)
           end
         end
+        describe 'with Errno::ENETUNREACH' do
+          it 'should be tolerant of intermittent routing errors' do
+            Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Errno::ENETUNREACH, 'root').then.returns(true)
+            subject.ssh_test_connect('server', 'root', @keyfile.path)
+          end
+        end
       end
       describe 'with general Exception failures' do
         it 'should not be tolerant of intermittent errors' do
