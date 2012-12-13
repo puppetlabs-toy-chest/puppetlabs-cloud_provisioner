@@ -854,6 +854,7 @@ module Puppet::CloudPack
       {
         'status'               => 'success',
         'puppetagent_certname' => puppetagent_certname,
+        'stdout'               => results[:stdout],
       }
     end
 
