@@ -63,7 +63,7 @@ deb http://apt.puppetlabs.com/ ${release} main
 EOFAPTREPO
   apt-get update
   # Install Puppet from Debian repositories
-  apt-get -y install puppet
+  apt-get -y install puppet<% if options[:puppet_version] %>=<%= options[:puppet_version] %><% end %>
 }
 
 function install_puppet() {
