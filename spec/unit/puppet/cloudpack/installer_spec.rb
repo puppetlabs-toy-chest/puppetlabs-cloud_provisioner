@@ -33,7 +33,7 @@ describe installer_klass do
     end
     it 'should fail when it cannot find a script' do
       now = Time.now.to_i
-      expect { installer_klass.find_template("foo_#{now}") }.should raise_error(Exception, /Could not find/)
+      expect { installer_klass.find_template("foo_#{now}") }.to raise_error(Exception, /Could not find/)
     end
   end
   describe 'when compiling the script' do
