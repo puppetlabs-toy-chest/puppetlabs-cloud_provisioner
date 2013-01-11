@@ -12,9 +12,10 @@ ARGV.clear
 
 require 'puppet'
 require 'puppet/face'
+require 'puppet/cloudpack'
 require 'mocha'
 require 'fog'
-gem 'rspec', '>=2.0.0'
+require 'rspec'
 
 Fog.credentials_path = File.join(dir, 'fog-stub-configuration')
 Fog.mock!
