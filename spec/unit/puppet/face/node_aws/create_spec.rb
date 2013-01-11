@@ -52,7 +52,7 @@ describe Puppet::Face[:node_aws, :current] do
       end
 
       it 'should exit on improper value' do
-        @options[:tags] = 'tag1=value2,tag2=value,=broken'
+        @options[:instance_tags] = 'tag1=value2,tag2=value,=broken'
         expect { subject.create(@options) }.to raise_error ArgumentError, /could not parse/i
       end
     end
@@ -116,13 +116,13 @@ describe Puppet::Face[:node_aws, :current] do
   describe 'option validation with create() Mock' do
     describe '(security-group)' do
       it 'should call group_option_before_action' do
-        @options[:group] = %w[ A B C D E ].join(File::PATH_SEPARATOR)
+        @options[:security_group] = %w[ A B C D E ].join(File::PATH_SEPARATOR)
         # This makes sure the before_action calls the group_option_before_action
         # correctly with the options we've specified.
         # We raise the exception to prevent the call to the create() action
         # from happening.
         Puppet::CloudPack.stubs(:group_option_before_action).with() do |options|
-          if options[:group] == @options[:group] then
+          if options[:security_group] == @options[:security_group] then
             raise Exception, 'group_option_before_action called correctly'
           else
             raise Exception, 'group_option_before_action called incorrectly'
@@ -132,9 +132,9 @@ describe Puppet::Face[:node_aws, :current] do
       end
 
       it 'should validate all group names' do
-        @options[:group] = %w[ A B C ]
+        @options[:security_group] = %w[ A B C ]
         expect { subject.create(@options) }.to raise_error ArgumentError,
-          /unrecognized.*: #{@options[:group].join(', ')}/i
+          /unrecognized.*: #{@options[:security_group].join(', ')}/i
       end
     end
   end

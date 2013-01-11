@@ -84,10 +84,12 @@ module Puppet::CloudPack
 
     # JJM This method is separated from the before_action block to aid testing.
     def group_option_before_action(options)
-      options[:group] = options[:group].split(File::PATH_SEPARATOR) unless options[:group].is_a? Array
+      if not options[:security_group].is_a? Array
+        options[:security_group] = options[:security_group].split(File::PATH_SEPARATOR)
+      end
 
       known = Puppet::CloudPack.create_connection(options).security_groups
-      unknown = options[:group].select { |g| known.get(g).nil? }
+      unknown = options[:security_group].select { |g| known.get(g).nil? }
       unless unknown.empty?
         raise ArgumentError, "Unrecognized security groups: #{unknown.join(', ')}"
       end
@@ -106,7 +108,7 @@ module Puppet::CloudPack
     end
 
     def add_tags_option(action)
-      action.option '--inst_tags=', '-t=' do
+      action.option '--instance-tags=', '-t=' do
         summary 'The tags the instance should have in format tag1=value1,tag2=value2'
         description <<-EOT
           Instances may be tagged with custom tags. The tags should be in the
@@ -209,7 +211,7 @@ module Puppet::CloudPack
     end
 
     def add_group_option(action)
-      action.option '--sec-group=', '-g=', '--security-group=' do
+      action.option '--security-group=', '-g=' do
         summary "The instance's security group(s)."
         description <<-EOT
           The security group(s) that the machine will be associated with. A
