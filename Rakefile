@@ -1,3 +1,5 @@
+require 'puppetlabs_spec_helper/rake_tasks'
+
 def get_version
   `git describe`.strip
 end

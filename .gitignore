@@ -2,3 +2,7 @@ pkg/
 tmp/
 .DS_Store
 metadata.json
+spec/fixtures/
+.bundle/
+vendor/
+Gemfile.lock

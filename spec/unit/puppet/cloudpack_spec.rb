@@ -780,9 +780,9 @@ describe Puppet::CloudPack do
       }
     end
     it 'should split a group string on the path separator' do
-      @options[:group] = %w[ A B C D E ].join(File::PATH_SEPARATOR)
+      @options[:security_group] = %w[ A B C D E ].join(File::PATH_SEPARATOR)
       Puppet::CloudPack.stubs(:create_connection).with() do |options|
-        if options[:group] == %w[ A B C D E ] then
+        if options[:security_group] == %w[ A B C D E ] then
           raise Exception, 'group was split as expected'
         else
           raise Exception, 'group was not split as expected'
