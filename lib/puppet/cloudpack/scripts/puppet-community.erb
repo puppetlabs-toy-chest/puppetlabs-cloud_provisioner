@@ -128,6 +128,8 @@ function provision_puppet() {
     export breed='redhat'
   elif [ -f /etc/debian_version ]; then
     export breed='debian'
+  elif [ -f /etc/system-release ]; then
+    export breed='redhat'
   else
     echo "This OS is not supported by Puppet Cloud Provisioner"
     exit 1
