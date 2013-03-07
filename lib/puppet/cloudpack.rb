@@ -919,7 +919,8 @@ module Puppet::CloudPack
           Errno::ECONNREFUSED            => "Failed to connect. This may be because the machine is booting.  Retrying the connection...",
           Errno::ETIMEDOUT               => "Failed to connect. This may be because the machine is booting.  Retrying the connection..",
           Errno::ECONNRESET              => "Connection reset. Retrying the connection...",
-          Timeout::Error                 => "Connection test timed-out. This may be because the machine is booting.  Retrying the connection..."
+          Timeout::Error                 => "Connection test timed-out. This may be because the machine is booting.  Retrying the connection...",
+          Errno::ENETUNREACH             => "Network unreachable.  Retrying the connection...",
       }
 
       Puppet::CloudPack::Utils.retry_action( :timeout => 250, :retry_exceptions => retry_exceptions ) do
