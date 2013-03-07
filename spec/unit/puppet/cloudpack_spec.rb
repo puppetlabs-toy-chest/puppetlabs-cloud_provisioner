@@ -251,6 +251,9 @@ describe Puppet::CloudPack do
       it 'should return the specified certname' do
         subject.install(@server, @options)['status'].should == 'success'
       end
+      it 'should return stdout' do
+        subject.install(@server, @options)['stdout'].should == 'fakestdout'
+      end
       it 'should set server as public_dns_name option' do
         subject.expects(:compile_template).with do |options|
           options[:public_dns_name] == @server
