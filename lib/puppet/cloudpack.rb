@@ -836,6 +836,8 @@ module Puppet::CloudPack
         raise Puppet::Error, "The installation script exited with a non-zero exit status, indicating a failure.  It may help to run with --debug to see the script execution or to check the installation log file on the remote system in #{options[:tmp_dir]}."
       end
 
+      stdout = results[:stdout]
+
       # At this point we may assume installation of Puppet succeeded since the
       # install script returned with a zero exit code.
 
@@ -854,6 +856,7 @@ module Puppet::CloudPack
       {
         'status'               => 'success',
         'puppetagent_certname' => puppetagent_certname,
+        'stdout'               => stdout
       }
     end
 
