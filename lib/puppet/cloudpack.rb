@@ -123,7 +123,7 @@ module Puppet::CloudPack
           ## A regex is needed that will allow us to escape ',' characters
           ## from the CLI
           begin
-            options[:tags] = Hash[ options[:tags].split(',').map do |tag| 
+            options[:instance_tags] = Hash[ options[:instance_tags].split(',').map do |tag|
               tag_array = tag.split('=',2)
               if tag_array.size != 2
                 raise ArgumentError, 'Could not parse tags given. Please check your format'
@@ -651,7 +651,7 @@ module Puppet::CloudPack
 
       unless (options[:tags_not_supported])
         tags = {'Created-By' => 'Puppet'}
-        tags.merge! options[:tags] if options[:tags]
+        tags.merge! options[:instance_tags] if options[:instance_tags]
 
         Puppet.notice('Creating tags for instance ... ')
         create_tags(connection.tags, server.id, tags)
