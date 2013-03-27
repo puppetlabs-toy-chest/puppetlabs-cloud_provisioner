@@ -81,6 +81,20 @@ module Puppet::CloudPack
         end
       end
     end
+    def add_floating_ip_option(action)
+      action.option '--floating-ip' do
+        summary 'Floating IP.'
+        description <<-EOT
+          Adds floating IP to instance.
+        EOT
+
+        before_action do |action, args, options|
+          if Puppet::CloudPack.check_floating_ip(Puppet::CloudPack.create_connection(options)).nil?
+            raise ArgumentError, "No free ips in ip pool: (Suggestion: Get some free ips in your floating pool)"
+          end
+        end
+      end
+    end
 
     # JJM This method is separated from the before_action block to aid testing.
     def group_option_before_action(options)
@@ -683,6 +697,13 @@ module Puppet::CloudPack
       # This is the earliest point we have knowledge of the DNS name
       Puppet.notice("Server #{server.id} public dns name: #{server.dns_name}")
 
+      if options[:floating_ip]
+        Puppet.notice('Adding floating-ip ... ')
+        addr = add_floating_ip(connection, server)
+        Puppet.notice("Adding floating ip ... Done")
+        Puppet.notice("Floating ip: #{addr}")
+      end
+      
       if options[:_destroy_server_at_exit] == :create
         options.delete(:_destroy_server_at_exit)
       end
@@ -1044,6 +1065,26 @@ module Puppet::CloudPack
       server = servers.create(options)
       Puppet.notice("Creating new instance ... Done")
       return server
+    end
+    
+    def check_floating_ip(connection)
+      connection.addresses.each do |addr|
+        if addr.server_id.nil?
+          return addr
+        end
+      end
+      return nil
+    end
+
+    def add_floating_ip(connection, server)
+      addr = check_floating_ip(connection)
+      if addr.nil?
+        # Raise error, should cause instance to auto terminate
+        raise('Failed to find a floating ip to associate to new instance.')
+      end
+      
+      addr.server=server
+      return addr.public_ip
     end
 
     def create_tags(t_connection, resource_id, tags)
