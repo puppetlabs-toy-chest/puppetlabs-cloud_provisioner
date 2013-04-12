@@ -633,7 +633,7 @@ module Puppet::CloudPack
       server     = create_server(connection.servers,
         :image_id   => options[:image],
         :key_name   => options[:keyname],
-        :groups     => options[:group],
+        :groups     => options[:security_group],
         :flavor_id  => options[:type],
         :subnet_id     => options[:subnet],
         :availability_zone => options[:availability_zone]
