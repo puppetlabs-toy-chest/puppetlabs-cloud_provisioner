@@ -680,14 +680,25 @@ module Puppet::CloudPack
         return nil
       end
 
-      # This is the earliest point we have knowledge of the DNS name
-      Puppet.notice("Server #{server.id} public dns name: #{server.dns_name}")
+      if options[:subnet]
+        Puppet.notice("Server #{server.id} in VPC subnet #{options[:subnet]}, private IP: #{server.private_ip_address}")
+      else
+        # This is the earliest point we have knowledge of the DNS name
+        Puppet.notice("Server #{server.id} public dns name: #{server.dns_name}")
+      end
 
       if options[:_destroy_server_at_exit] == :create
         options.delete(:_destroy_server_at_exit)
       end
 
-      return server.dns_name
+      # NOTE:
+      #  - detects if installation is in a VPC
+      #  - returns the private IP address instead of DNS
+      if options[:subnet]
+        return server.private_ip_address
+      else
+        return server.dns_name
+      end
     end
 
     def list_keynames(options = {})
@@ -795,6 +806,14 @@ module Puppet::CloudPack
     end
 
     def install(server, options)
+
+      # TODO:
+      # - fails if server is undefined/empty, otherwise it will
+      #   connect to localhost
+      unless server
+        Puppet.err "Aborting installation. Can't determine DNS name or IP!"
+        exit(1)
+      end
 
       # If the end user wants to use their agent, we need to set keyfile to nil
       if options[:keyfile] == 'agent' then
