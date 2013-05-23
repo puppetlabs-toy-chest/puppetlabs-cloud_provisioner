@@ -33,12 +33,42 @@ gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
 EOFYUMREPO
 }
 
+function el_repo_aws() {
+# NOTE: hard coding $releasever for now
+  cat >/etc/yum.repos.d/puppet.repo <<'EOFYUMREPO'
+[puppetlabs-products]
+name=Puppet Labs Products El 6 - $basearch
+baseurl=http://yum.puppetlabs.com/el/6/products/$basearch
+gpgkey=http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
+enabled=1
+gpgcheck=1
+
+[puppetlabs-deps]
+name=Puppet Labs Dependencies El 6 - $basearch
+baseurl=http://yum.puppetlabs.com/el/6/dependencies/$basearch
+gpgkey=http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
+enabled=1
+gpgcheck=1
+EOFYUMREPO
+}
+
 function rpm_install() {
   # Setup the yum Puppet repository
   rpm -q fedora-release && fedora_repo || el_repo
 
   # Install Puppet from yum.puppetlabs.com
   yum install -y puppet<% if options[:puppet_version] %>-<%= options[:puppet_version] %><% end %>
+}
+
+function rpm_install_aws() {
+  # Setup the yum Puppet repository
+  el_repo_aws
+
+  # Install Puppet from yum.puppetlabs.com
+  yum install -y --disableplugin=priorities puppet<% if options[:puppet_version] %>-<%= options[:puppet_version] %><% end %>
+
+  # set puppetlab repo to higher priority, AWS Linux has priorities plugin enabled for YUM
+  puppet resource yumrepo puppetlabs-products priority=5
 }
 
 function apt_install() {
@@ -72,6 +102,8 @@ function install_puppet() {
       rpm_install ;;
     "debian")
       apt_install ;;
+    "awslinux")
+      rpm_install_aws ;;
   esac
 }
 
@@ -105,7 +137,9 @@ EOFPUPPETDEFAULT
 }
 
 function start_puppet() {
-  /etc/init.d/puppet start
+  # /etc/init.d/puppet start
+  puppet resource cron puppet-agent ensure=present user=root minute=30 command='/usr/bin/puppet agent --onetime --no-daemonize --splay'
+  puppet agent -t
 }
 
 #This fuction is not called if no custom facts are given
@@ -126,6 +160,8 @@ function facts_dot_d() {
 function provision_puppet() {
   if [ -f /etc/redhat-release ]; then
     export breed='redhat'
+  elif [ -f /etc/system-release ]; then
+    export breed='awslinux'
   elif [ -f /etc/debian_version ]; then
     export breed='debian'
   else
