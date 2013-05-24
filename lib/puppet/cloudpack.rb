@@ -165,16 +165,11 @@ module Puppet::CloudPack
           Type of instance to be launched. The type specifies characteristics that
           a machine will have, such as architecture, memory, processing power, storage,
           and IO performance. The type selected will determine the cost of a machine instance.
-          Supported types are: 'm1.small','m1.medium','m1.large','m1.xlarge','t1.micro','m2.xlarge',
-          'm2.2xlarge','x2.4xlarge','c1.medium','c1.xlarge','cc1.4xlarge'.
+
+          All instance types available from EC2 are supported; see the EC2 documentation
+          online at http://aws.amazon.com/ec2/instance-types/ for details.
         EOT
         required
-        before_action do |action, args, options|
-          supported_types = ['m1.small','m1.medium','m1.large','m1.xlarge','t1.micro','m2.xlarge','m2.2xlarge','x2.4xlarge','c1.medium','c1.xlarge','cc1.4xlarge']
-          unless supported_types.include?(options[:type])
-            raise ArgumentError, "Type must be one of the following: #{supported_types.join(', ')}"
-          end
-        end
       end
     end
 
