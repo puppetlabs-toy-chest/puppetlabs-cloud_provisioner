@@ -336,7 +336,8 @@ describe Puppet::CloudPack do
     describe '#dashboard_classify' do
       before :each do
         @http = mock('Net::Http')
-        @http.expects('use_ssl=').with(false)
+        @http.expects('use_ssl=').with(true)
+        @http.expects('verify_mode=').with(0)
         @headers = { 'Content-Type' => 'application/json' }
       end
       def http_response_mock(stubbed_methods = {})
