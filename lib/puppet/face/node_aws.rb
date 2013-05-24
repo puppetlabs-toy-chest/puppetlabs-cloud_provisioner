@@ -1,7 +1,7 @@
 require 'puppet/face'
 
 Puppet::Face.define(:node_aws, '0.0.1') do
-  copyright "Puppet Labs", 2011
+  copyright "Puppet Labs", 2011 .. 2013
   license   "Apache 2 license; see COPYING"
 
   summary "View and manage Amazon AWS EC2 nodes."
