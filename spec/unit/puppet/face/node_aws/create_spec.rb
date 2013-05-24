@@ -62,11 +62,6 @@ describe Puppet::Face[:node_aws, :current] do
         @options.delete(:type)
         expect { subject.create(@options) }.to raise_error ArgumentError, /required/
       end
-
-      it 'should validate the type' do
-        @options[:type] = 'UnsupportedType'
-        expect { subject.create(@options) }.to raise_error ArgumentError, /one of/
-      end
     end
 
     describe '(image)' do
