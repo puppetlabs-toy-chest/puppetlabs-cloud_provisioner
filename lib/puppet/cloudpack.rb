@@ -430,19 +430,6 @@ module Puppet::CloudPack
         end
       end
 
-      action.option '--pe-version=' do
-        summary 'Version of Puppet Enterprise to install.'
-        description <<-EOT
-          Version of Puppet Enterprise to be passed to the installer script.
-          Defaults to 1.1.
-        EOT
-        before_action do |action, arguments, options|
-          unless options[:pe_version] =~ /^(\d+)\.(\d+)(\.(\d+))?$|^(\d)+\.(\d)+\.(\d+)([a-zA-Z][a-zA-Z0-9-]*)$/
-            raise ArgumentError, "Invaid Puppet Enterprise version '#{options[:pe_version]}'"
-          end
-        end
-      end
-
       action.option '--facter-version=' do
         summary 'Version of facter to install.'
         description <<-EOT
