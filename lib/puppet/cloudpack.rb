@@ -459,16 +459,6 @@ module Puppet::CloudPack
     end
 
     def add_classify_options(action)
-      action.option '--enc-ssl' do
-        summary 'Whether to use SSL when connecting to the ENC.'
-        description <<-'EOT'
-          By default, we do not connect to the ENC over SSL.  This option
-          configures all HTTP connections to the ENC to use SSL in order to
-          provide encryption. This option should be set when using Puppet
-          Enterprise 2.0 and higher.
-        EOT
-      end
-
       action.option '--enc-server=' do
         summary 'The external node classifier hostname.'
         description <<-EOT
@@ -550,15 +540,10 @@ module Puppet::CloudPack
       # The Net::HTTP client instance
       http = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
 
-      if options[:enc_ssl] then
-        http.use_ssl = true
-        uri_scheme = 'https'
-        # We intentionally use SSL only for encryption and not authenticity checking
-        http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-      else
-        http.use_ssl = false
-        uri_scheme = 'http'
-      end
+      http.use_ssl = true
+      uri_scheme = 'https'
+      # We intentionally use SSL only for encryption and not authenticity checking
+      http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 
       Puppet.notice "Contacting #{uri_scheme}://#{options[:enc_server]}:#{options[:enc_port]}/ to classify #{certname}"
 
