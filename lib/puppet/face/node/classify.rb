@@ -22,7 +22,6 @@ Puppet::Face.define :node, '0.0.1' do
           puppet node classify \
             --enc-server puppetmaster.example.com \
             --enc-port 3000 \
-            --enc-ssl \
             --node-group pe_agents \
             agent01.example.com
     EOEXAMPLE
