@@ -471,9 +471,7 @@ module Puppet::CloudPack
           authentication, use this option to supply credentials for accessing it.
 
           Note: This option will default to the PUPPET_ENC_AUTH_USER
-          environment variable.  Please use this environment variable if you
-          are concerned about usernames and passwords being exposed via the
-          Unix process table.
+          environment variable.
         EOT
         default_to do ENV['PUPPET_ENC_AUTH_USER'] end
       end
@@ -486,9 +484,7 @@ module Puppet::CloudPack
           authentication, use this option to supply credentials for accessing it.
 
           Note: This option will default to the PUPPET_ENC_AUTH_PASSWD
-          environment variable.  Please use this environment variable if you
-          are concerned about usernames and passwords being exposed via the
-          Unix process table.
+          environment variable.
         EOT
         default_to do ENV['PUPPET_ENC_AUTH_PASSWD'] end
       end
@@ -579,7 +575,7 @@ module Puppet::CloudPack
         when /401/
           Puppet.notice "A 401 response is the HTTP code for an Unauthorized request"
           Puppet.notice "This error likely means you need to supply the --enc-auth-user and --enc-auth-passwd options"
-          Puppet.notice "Alternatively set PUPPET_ENC_AUTH_PASSWD environment variable for increased security"
+          Puppet.notice "Alternatively, use the PUPPET_ENC_AUTH_PASSWD environment variable"
         end
         raise Puppet::Error, "Could not: #{action}, got #{response.code} expected #{expected_code}"
       end
