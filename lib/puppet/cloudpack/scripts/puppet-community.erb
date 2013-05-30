@@ -59,7 +59,7 @@ function apt_install() {
 
   # Setup the apt Puppet repository
   cat > /etc/apt/sources.list.d/puppetlabs.list <<EOFAPTREPO
-deb http://apt.puppetlabs.com/ ${release} main
+deb http://apt.puppetlabs.com/ ${release} main dependencies
 EOFAPTREPO
   apt-get update
   # Install Puppet from Debian repositories
