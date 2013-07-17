@@ -54,7 +54,7 @@ module Puppet::CloudPack
         args << data.to_pson
       end
 
-      args << @headers.to_hash
+      args << @headers
 
       do_request(*args)
     end
