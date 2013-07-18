@@ -11,6 +11,78 @@ require 'timeout'
 module Puppet::CloudPack
   class InstanceErrorState < Exception
   end
+
+  class HttpWrapper
+    class HttpHeaders
+      include Net::HTTPHeader
+
+      def initialize(headers = nil)
+        initialize_http_header(headers)
+      end
+
+      def to_hash
+        hash = {}
+        each do |k, v|
+          hash[k] = v
+        end
+        hash
+      end
+    end
+
+    def initialize(options)
+      headers = HttpHeaders.new
+      # Authentication information
+      headers.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) unless options[:enc_auth_user].nil?
+      # Content Type of the request
+      headers.set_content_type('application/json')
+
+      @headers = headers.to_hash
+    end
+
+    def request(path, data)
+      args = if data.nil?
+        [:get, path, @headers]
+      else
+        [:post, path, data.to_pson, @headers]
+      end
+
+      do_request(*args)
+    end
+  end
+
+  class NetHttpWrapper < HttpWrapper
+    def initialize(options)
+      super
+
+      delegate = Net::HTTP.new(options[:enc_server], options[:enc_port])
+      delegate.use_ssl = true
+
+      # the NetHttpWrapper is only used if the --insecure option was specified
+      # so we only use SSL for encryption and not for authenticity checking
+      delegate.verify_mode = OpenSSL::SSL::VERIFY_NONE
+
+      @delegate = delegate
+    end
+
+    def do_request(*args)
+      @delegate.send(*args)
+    end
+  end
+
+  class PuppetHttpWrapper < HttpWrapper
+    def initialize(options)
+      super
+
+      # puppet http connection uses ssl for both encryption
+      # and authenticity checking if possible
+      @delegate = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
+    end
+
+    def do_request(*args)
+      @delegate.request(*args)
+    end
+  end
+
   require 'puppet/cloudpack/installer'
   class << self
 
@@ -123,7 +195,7 @@ module Puppet::CloudPack
           ## A regex is needed that will allow us to escape ',' characters
           ## from the CLI
           begin
-            options[:instance_tags] = Hash[ options[:instance_tags].split(',').map do |tag| 
+            options[:instance_tags] = Hash[ options[:instance_tags].split(',').map do |tag|
               tag_array = tag.split('=',2)
               if tag_array.size != 2
                 raise ArgumentError, 'Could not parse tags given. Please check your format'
@@ -259,7 +331,7 @@ module Puppet::CloudPack
         summary 'Set custom facts in format of fact1=value,fact2=value'
         description <<-'EOT'
           To install custom facts during install of a node, use the format
-          fact1=value,fact2=value. Currently, there is no way to escape 
+          fact1=value,fact2=value. Currently, there is no way to escape
           the ',' character so facts cannot contain this character.
 
           Requirements:
@@ -279,7 +351,7 @@ module Puppet::CloudPack
           ## A regex is needed that will allow us to escape ',' characters
           ## from the CLI
           begin
-            options[:facts] = Hash[ options[:facts].split(',').map do |fact| 
+            options[:facts] = Hash[ options[:facts].split(',').map do |fact|
               fact_array = fact.split('=',2)
               if fact_array.size != 2
                 raise ArgumentError, 'Could not parse facts given. Please check your format'
@@ -498,6 +570,15 @@ module Puppet::CloudPack
           automatically be registered when assigning it to a group.
         EOT
       end
+
+      action.option '--insecure' do
+        summary 'Don\'t perform PE console certificate verification.'
+        description <<-'EOT'
+          Don't perform verification of the certificate supplied
+          by the PE console server.
+        EOT
+        default_to { false }
+      end
     end
 
     def bootstrap(options)
@@ -515,15 +596,9 @@ module Puppet::CloudPack
     end
 
     def dashboard_classify(certname, options)
-      # The Net::HTTP client instance
-      http = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
+      http = (options[:insecure] ? NetHttpWrapper : PuppetHttpWrapper).new(options)
 
-      http.use_ssl = true
-      uri_scheme = 'https'
-      # We intentionally use SSL only for encryption and not authenticity checking
-      http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-
-      Puppet.notice "Contacting #{uri_scheme}://#{options[:enc_server]}:#{options[:enc_port]}/ to classify #{certname}"
+      Puppet.notice "Contacting https://#{options[:enc_server]}:#{options[:enc_port]}/ to classify #{certname}"
 
       # This block create the node and returns it to the caller
       notfound_register_the_node = lambda do
@@ -1042,19 +1117,9 @@ module Puppet::CloudPack
     # Method to make generic, SSL, Authenticated HTTP requests
     # and parse the JSON response.  Primarily for #10377 and #10197
     def http_request(http, path, options = {}, action = nil, expected_code = '200', data = nil)
-      action ||= path
-      # We need to POST data, otherwise we'll use GET
-      request = data ? Net::HTTP::Post.new(path) : Net::HTTP::Get.new(path)
-      # Set the form data
-      request.body = data.to_pson if data
-      # Authentication information
-      request.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) if ! options[:enc_auth_user].nil?
-      # Content Type of the request
-      request.set_content_type('application/json')
-
       # Wrap the request in an exception handler
       begin
-        response = http.start { |http| http.request(request) }
+        response = http.request(path, data)
       rescue Errno::ECONNREFUSED => e
         Puppet.warning 'Registering node ... Error'
         Puppet.err "Could not connect to host #{options[:enc_server]} on port #{options[:enc_port]}"
@@ -1065,7 +1130,7 @@ module Puppet::CloudPack
         raise ex
       end
       # Return the parsed JSON response
-      handle_json_response(response, action, expected_code)
+      handle_json_response(response, action || path, expected_code)
     end
 
     # Take a block and a timeout and display a progress bar while we're doing our thing
