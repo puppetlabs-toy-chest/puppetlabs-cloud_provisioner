@@ -30,8 +30,6 @@ module Puppet::CloudPack
     end
 
     def initialize(options)
-      initialize_delegate(options[:enc_server], options[:enc_port])
-
       headers = HttpHeaders.new
       # Authentication information
       headers.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) unless options[:enc_auth_user].nil?
@@ -42,27 +40,21 @@ module Puppet::CloudPack
     end
 
     def request(path, data)
-      args = [path]
-
-      if data.nil?
-        # No data was supplied - we send a GET request
-        args.unshift(:get)
+      args = if data.nil?
+        [:get, path, @headers]
       else
-        # Data was supplied - we send a POST request
-        args.unshift(:post)
-        # Set the form data
-        args << data.to_pson
+        [:post, path, data.to_pson, @headers]
       end
-
-      args << @headers
 
       do_request(*args)
     end
   end
 
   class NetHttpWrapper < HttpWrapper
-    def initialize_delegate(server, port)
-      delegate = Net::HTTP.new(server, port)
+    def initialize(options)
+      super
+
+      delegate = Net::HTTP.new(options[:enc_server], options[:enc_port])
       delegate.use_ssl = true
 
       # the NetHttpWrapper is only used if the --insecure option was specified
@@ -78,10 +70,12 @@ module Puppet::CloudPack
   end
 
   class PuppetHttpWrapper < HttpWrapper
-    def initialize_delegate(server, port)
+    def initialize(options)
+      super
+
       # puppet http connection uses ssl for both encryption
       # and authenticity checking if possible
-      @delegate = Puppet::Network::HTTP::Connection.new(server, port)
+      @delegate = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
     end
 
     def do_request(*args)
@@ -583,7 +577,7 @@ module Puppet::CloudPack
           Don't perform verification of the certificate supplied
           by the PE console server.
         EOT
-        default_to do false end
+        default_to { false }
       end
     end
 
