@@ -11,6 +11,31 @@ require 'timeout'
 module Puppet::CloudPack
   class InstanceErrorState < Exception
   end
+
+  # This is a utility class to provide access to the methods defined
+  # in the +Net::HTTPHeader+ module (e.g. +set_content_type+,
+  # +basic_auth+, etc.).
+  # Additionally it overrides the +to_hash+ method to return a hash
+  # of simple (+String+) values rather than a hash of +Array+s so that
+  # the returned value is usable as input to +Net::HTTP.get+,
+  # +Net::HTTP.post+ etc. family of methods (and consequently the
+  # +Puppet::Network::HTTP::Connection.request+ method).
+  class HttpHeaders
+    include Net::HTTPHeader
+
+    def initialize(headers = nil)
+      initialize_http_header(headers)
+    end
+
+    def to_hash
+      hash = {}
+      each do |k, v|
+        hash[k] = v
+      end
+      hash
+    end
+  end
+
   require 'puppet/cloudpack/installer'
   class << self
 
@@ -498,6 +523,17 @@ module Puppet::CloudPack
           automatically be registered when assigning it to a group.
         EOT
       end
+
+      action.option '--insecure' do
+        summary 'Don\'t perform ENC SSL certificate verification'
+        description <<-'EOT'
+          Don't verify the SSL certificate when connecting to an ENC.
+          When connecting to the Puppet Enterprise Console, verification can be
+          optionally skipped as older versions of the PE Console used to use
+          certificates with a hardcoded Common Name which cannot be verified.
+        EOT
+        default_to { false }
+      end
     end
 
     def bootstrap(options)
@@ -515,15 +551,10 @@ module Puppet::CloudPack
     end
 
     def dashboard_classify(certname, options)
-      # The Net::HTTP client instance
-      http = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port])
+      # The Puppet::Network::HTTP::Connection instance
+      http = Puppet::Network::HttpPool.http_instance(options[:enc_server], options[:enc_port], true, !options[:insecure])
 
-      http.use_ssl = true
-      uri_scheme = 'https'
-      # We intentionally use SSL only for encryption and not authenticity checking
-      http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-
-      Puppet.notice "Contacting #{uri_scheme}://#{options[:enc_server]}:#{options[:enc_port]}/ to classify #{certname}"
+      Puppet.notice "Contacting https://#{options[:enc_server]}:#{options[:enc_port]}/ to classify #{certname}"
 
       # This block create the node and returns it to the caller
       notfound_register_the_node = lambda do
@@ -1042,19 +1073,22 @@ module Puppet::CloudPack
     # Method to make generic, SSL, Authenticated HTTP requests
     # and parse the JSON response.  Primarily for #10377 and #10197
     def http_request(http, path, options = {}, action = nil, expected_code = '200', data = nil)
-      action ||= path
-      # We need to POST data, otherwise we'll use GET
-      request = data ? Net::HTTP::Post.new(path) : Net::HTTP::Get.new(path)
-      # Set the form data
-      request.body = data.to_pson if data
+      headers = HttpHeaders.new
       # Authentication information
-      request.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) if ! options[:enc_auth_user].nil?
+      headers.basic_auth(options[:enc_auth_user], options[:enc_auth_passwd]) unless options[:enc_auth_user].nil?
       # Content Type of the request
-      request.set_content_type('application/json')
+      headers.set_content_type('application/json')
+      # Convert the headers to a plain hash
+      headers = headers.to_hash
+
+      # Prepare the arguments of the request call
+      args = data.nil? \
+        ? [:get, path, headers] \
+        : [:post, path, data.to_pson, headers]
 
       # Wrap the request in an exception handler
       begin
-        response = http.start { |http| http.request(request) }
+        response = http.request(*args)
       rescue Errno::ECONNREFUSED => e
         Puppet.warning 'Registering node ... Error'
         Puppet.err "Could not connect to host #{options[:enc_server]} on port #{options[:enc_port]}"
@@ -1065,7 +1099,7 @@ module Puppet::CloudPack
         raise ex
       end
       # Return the parsed JSON response
-      handle_json_response(response, action, expected_code)
+      handle_json_response(response, action || path, expected_code)
     end
 
     # Take a block and a timeout and display a progress bar while we're doing our thing
