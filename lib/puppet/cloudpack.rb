@@ -148,7 +148,7 @@ module Puppet::CloudPack
           ## A regex is needed that will allow us to escape ',' characters
           ## from the CLI
           begin
-            options[:instance_tags] = Hash[ options[:instance_tags].split(',').map do |tag| 
+            options[:instance_tags] = Hash[ options[:instance_tags].split(',').map do |tag|
               tag_array = tag.split('=',2)
               if tag_array.size != 2
                 raise ArgumentError, 'Could not parse tags given. Please check your format'
@@ -284,7 +284,7 @@ module Puppet::CloudPack
         summary 'Set custom facts in format of fact1=value,fact2=value'
         description <<-'EOT'
           To install custom facts during install of a node, use the format
-          fact1=value,fact2=value. Currently, there is no way to escape 
+          fact1=value,fact2=value. Currently, there is no way to escape
           the ',' character so facts cannot contain this character.
 
           Requirements:
@@ -304,7 +304,7 @@ module Puppet::CloudPack
           ## A regex is needed that will allow us to escape ',' characters
           ## from the CLI
           begin
-            options[:facts] = Hash[ options[:facts].split(',').map do |fact| 
+            options[:facts] = Hash[ options[:facts].split(',').map do |fact|
               fact_array = fact.split('=',2)
               if fact_array.size != 2
                 raise ArgumentError, 'Could not parse facts given. Please check your format'
