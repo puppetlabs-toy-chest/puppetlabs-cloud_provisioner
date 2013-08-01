@@ -337,30 +337,6 @@ describe Puppet::CloudPack do
       let :http do
         mock('Puppet::Network::HTTP::Connection')
       end
-      def http_response_mock(stubbed_methods = {})
-        stubbed_methods = {:code => '200', :message => "OK", :content_type => "application/json"}.merge(stubbed_methods)
-        http_mock = mock('Net::HTTPResponse')
-        http_mock.stubs(stubbed_methods)
-        http_mock
-      end
-      let :ok_host_list do
-        http_response_mock(:body => '[{"reported_at":null,"name":"certname", "id":"1" }]')
-      end
-      let :ok_group_list do
-        http_response_mock(:body => '[{"name":"foo","id":"1"}]')
-      end
-      let :ok_add do
-        http_response_mock(:code => '201', :body => '{"id":"1"}')
-      end
-      let :ok_member_list do
-        http_response_mock(:body => '[{"node_group_id":"1", "node_id":"1"}]')
-      end
-      let :empty_list do
-        http_response_mock(:body => '[]')
-      end
-      let :http_fail do
-        http_response_mock(:code => '400', :body => '[]')
-      end
 
       let :response_nodes_only_master do
         [{"name"=>"puppetmaster",
@@ -405,13 +381,13 @@ describe Puppet::CloudPack do
       let :response_node_group_members_already_registered do
         [{"node_group_id"=>1, "node_id"=>7}]
       end
+
       let :response_node_group_members_not_registered do
         [{"node_group_id"=>1, "node_id"=>1}]
       end
 
       describe 'default options' do
         it 'should use the default enc options' do
-          Puppet::Network::HttpPool.http_instance('puppet', 3000)
           Puppet::Network::HttpPool.expects(:http_instance).with('puppet', 3000, true, true).returns(http)
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
             path == '/nodes.json' && action =~ /list nodes/i
