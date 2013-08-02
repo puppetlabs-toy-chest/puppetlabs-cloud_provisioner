@@ -15,6 +15,7 @@ describe Puppet::Face[:node, :current] do
         :enc_port => 3000,
         :enc_auth_user => nil,
         :enc_auth_passwd => nil,
+        :insecure => false,
       }
     end
 
