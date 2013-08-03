@@ -334,35 +334,8 @@ describe Puppet::CloudPack do
       end
     end
     describe '#dashboard_classify' do
-      before :each do
-        @http = mock('Net::Http')
-        @http.expects('use_ssl=').with(true)
-        @http.expects('verify_mode=').with(0)
-        @headers = { 'Content-Type' => 'application/json' }
-      end
-      def http_response_mock(stubbed_methods = {})
-        stubbed_methods = {:code => '200', :message => "OK", :content_type => "application/json"}.merge(stubbed_methods)
-        http_mock = mock('Net::HTTPResponse')
-        http_mock.stubs(stubbed_methods)
-        http_mock
-      end
-      let :ok_host_list do
-        http_response_mock(:body => '[{"reported_at":null,"name":"certname", "id":"1" }]')
-      end
-      let :ok_group_list do
-        http_response_mock(:body => '[{"name":"foo","id":"1"}]')
-      end
-      let :ok_add do
-        http_response_mock(:code => '201', :body => '{"id":"1"}')
-      end
-      let :ok_member_list do
-        http_response_mock(:body => '[{"node_group_id":"1", "node_id":"1"}]')
-      end
-      let :empty_list do
-        http_response_mock(:body => '[]')
-      end
-      let :http_fail do
-        http_response_mock(:code => '400', :body => '[]')
+      let :http do
+        mock('Puppet::Network::HTTP::Connection')
       end
 
       let :response_nodes_only_master do
@@ -408,14 +381,14 @@ describe Puppet::CloudPack do
       let :response_node_group_members_already_registered do
         [{"node_group_id"=>1, "node_id"=>7}]
       end
+
       let :response_node_group_members_not_registered do
         [{"node_group_id"=>1, "node_id"=>1}]
       end
 
       describe 'default options' do
         it 'should use the default enc options' do
-          Puppet::Network::HttpPool.http_instance('puppet', 3000)
-          Puppet::Network::HttpPool.expects(:http_instance).with('puppet', 3000).returns @http
+          Puppet::Network::HttpPool.expects(:http_instance).with('puppet', 3000, true, true).returns(http)
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
             path == '/nodes.json' && action =~ /list nodes/i
           end.returns(response_nodes_only_master)
@@ -432,9 +405,11 @@ describe Puppet::CloudPack do
         end
       end
       describe 'non default options' do
+        let :options do
+          { :node_group => 'foo', :enc_server => 'server', :enc_port => '3333' }
+        end
         before :each do
-          @options = { :node_group => 'foo', :enc_server => 'server', :enc_port => '3000' }
-          Puppet::Network::HttpPool.expects(:http_instance).with('server', '3000').returns @http
+          Puppet::Network::HttpPool.expects(:http_instance).with(options[:enc_server], options[:enc_port], true, true).returns(http)
         end
         it 'should create a node if it does not already exist in Dashboard' do
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
@@ -449,7 +424,7 @@ describe Puppet::CloudPack do
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
             path == '/memberships.json' && action =~ /list group members/i
           end.returns(response_node_group_members_already_registered)
-          subject.classify('certname', @options)
+          subject.classify('certname', options)
         end
 
         it 'should not create the node if it already exists in Dashboard' do
@@ -465,7 +440,7 @@ describe Puppet::CloudPack do
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
             path == '/memberships.json' && action =~ /list group members/i
           end.returns(response_node_group_members_already_registered)
-          subject.classify('certname', @options)
+          subject.classify('certname', options)
         end
         it 'should not add the node group to the node if it had already been added' do
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
@@ -480,7 +455,7 @@ describe Puppet::CloudPack do
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
             path == '/memberships.json' && action =~ /Classify node/i
           end.never # <= This is the key expectation
-          subject.classify('certname', @options)
+          subject.classify('certname', options)
         end
         it 'should add the node group to the node if it was not already added' do
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
@@ -495,7 +470,7 @@ describe Puppet::CloudPack do
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
             path == '/memberships.json' && action =~ /Classify node/i
           end # <= This is the key expectation
-          subject.classify('certname', @options)
+          subject.classify('certname', options)
         end
         it 'should fail when it cannot find the node group in the dashboard' do
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
@@ -504,7 +479,7 @@ describe Puppet::CloudPack do
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
             path == '/node_groups.json' && action =~ /list groups/i
           end.returns(response_node_groups_does_not_exist)
-          expect { subject.classify('certname', @options) }.should raise_error(Puppet::Error, /Groups must exist before they can be assigned to nodes/)
+          expect { subject.classify('certname', options) }.should raise_error(Puppet::Error, /Groups must exist before they can be assigned to nodes/)
         end
       end
     end
@@ -714,67 +689,63 @@ describe Puppet::CloudPack do
 
     describe '#http_request' do
       let :http do
-        http = mock('Net::Http')
-        http.expects(:start).returns(http_response)
-        http
-      end
-      let :http_post do
-        http = mock('Net::Http')
-        http.expects(:start).with() do
-        end
+        mock('Puppet::Network::HTTP::Connection')
       end
       let :options do
         { :enc_server=>"puppetmaster", :enc_port=>"3000" }
       end
       let :options_ssl_auth do
-        options.merge({ :enc_ssl=>true, :enc_auth_user=>"console", :enc_auth_passwd=>"puppet"})
+        options.merge({ :enc_auth_user=>"console", :enc_auth_passwd=>"puppet"})
+      end
+      let :headers do
+        { 'content-type' => 'application/json' }
+      end
+      let :headers_ssl_auth do
+        auth_headers = Puppet::CloudPack::HttpHeaders.new
+        auth_headers.basic_auth(options_ssl_auth[:enc_auth_user], options_ssl_auth[:enc_auth_passwd])
+        headers.merge(auth_headers.to_hash)
       end
       let :http_response do
         stub_everything('Net::HTTPOK')
-      end
-      let :request do
-        request = mock('Net::Http::Post')
-        request.expects(:set_content_type).with('application/json')
-        request
       end
       let :somedata do
         { 'node' => { 'name' => 'puppetagent.certname' } }
       end
       # http_request(http, path, options = {}, action = nil, expected_code = '200', data = nil)
       it 'Should default to expecting a 200 response' do
+        http.expects(:request).with(:get, '/foo.json', headers).returns(http_response)
         subject.expects(:handle_json_response).with(http_response, '/foo.json', '200')
         subject.http_request(http, '/foo.json', options)
       end
       it 'Should return whatever handle_json_response() returns' do
+        http.expects(:request).with(:get, '/foo.json', headers).returns(http_response)
         subject.expects(:handle_json_response).with(http_response, '/foo.json', '200').returns('OK')
         subject.http_request(http, '/foo.json', options).should eq 'OK'
       end
       it 'Should support an action description' do
+        http.expects(:request).with(:get, '/foo.json', headers).returns(http_response)
         subject.expects(:handle_json_response).with(http_response, 'Get Foo', '200')
         subject.http_request(http, '/foo.json', options, 'Get Foo')
       end
       it 'Should support HTTP codes other than 200' do
+        http.expects(:request).with(:get, '/foo.json', headers).returns(http_response)
         subject.expects(:handle_json_response).with(http_response, 'Get Foo', '201')
         subject.http_request(http, '/foo.json', options, 'Get Foo', '201')
       end
       it 'Should set the request body when data is provided' do
-        Net::HTTP::Post.expects(:new).returns(request)
-        request.expects(:body=).with(somedata.to_pson)
+        http.expects(:request).with(:post, '/foo.json', somedata.to_pson, headers).returns(http_response)
         subject.expects(:handle_json_response).with(http_response, 'Post Foo', '201')
         subject.http_request(http, '/foo.json', options, 'Post Foo', '201', somedata)
       end
       it 'Should set authentication data when --enc-auth-user is not nil and data is provided' do
-        Net::HTTP::Post.expects(:new).returns(request)
-        request.expects(:body=).with(somedata.to_pson)
-        request.expects(:basic_auth).with(options_ssl_auth[:enc_auth_user], options_ssl_auth[:enc_auth_passwd])
+        http.expects(:request).with(:post, '/foo.json', somedata.to_pson, headers_ssl_auth).returns(http_response)
         subject.expects(:handle_json_response).with(http_response, 'Post Foo', '201')
         subject.http_request(http, '/foo.json', options_ssl_auth, 'Post Foo', '201', somedata)
       end
       it 'Should set authentication data when --enc-auth-user is not nil and data is not provided' do
-        Net::HTTP::Get.expects(:new).returns(request)
-        request.expects(:basic_auth).with(options_ssl_auth[:enc_auth_user], options_ssl_auth[:enc_auth_passwd])
-        subject.expects(:handle_json_response).with(http_response, 'Post Foo', '201')
-        subject.http_request(http, '/foo.json', options_ssl_auth, 'Post Foo', '201')
+        http.expects(:request).with(:get, '/foo.json', headers_ssl_auth).returns(http_response)
+        subject.expects(:handle_json_response).with(http_response, 'Get Foo', '201')
+        subject.http_request(http, '/foo.json', options_ssl_auth, 'Get Foo', '201')
       end
     end
   end
