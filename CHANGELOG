@@ -1,3 +1,11 @@
+Thu May 30 2013 Matthaus Owens 1.0.7
+ * Config both 'main' and 'dependencies' apt repos
+ * PE-246: remove advice about security implications of environment variables
+ * PE-243: update copyright years in Cloud Provisioner
+ * PE-242: remove obsolete local AWS type validation
+ * PE-247: SSL for ENC communication is now on, and mandatory
+ * PE-239: Cloud Provisioner has unused, obsolete `--pe-version` option
+
 Tue May 07 2013 Moses Mendoza 1.0.6
  * retry ssh when Errno::ENETUNREACH is encountered
  * return stdout from executed scripts to install method
