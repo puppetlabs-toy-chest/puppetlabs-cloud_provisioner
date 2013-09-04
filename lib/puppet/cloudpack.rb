@@ -371,12 +371,16 @@ module Puppet::CloudPack
       end
 
       action.option '--installer-payload=' do
-        summary 'The location of the Puppet Enterprise universal gzipped tarball.'
+        summary 'The location of the gzipped Puppet Enterprise install tarball.'
         description <<-EOT
-          Location of the Puppet enterprise universal tarball to be used for
+          Location of the Puppet Enterprise install tarball to be used for
           the installation. Can be a local file path or a URL. This option is
           only required if Puppet should be installed on the machine. The
-          tarball specified must be gzipped.
+          specified tarball must be gzipped.
+          Note that the specified Puppet install tarball must support the
+          platform of the node on which the tarball is to be installed.
+          If you are unsure about the node platform, use the universal install
+          tarball. But be warned: it is huge.
         EOT
         before_action do |action, arguments, options|
           type = Puppet::CloudPack.payload_type(options[:installer_payload])
