@@ -573,24 +573,6 @@ describe Puppet::CloudPack do
           )
         end
       end
-      it 'should require installer payload when install-script is puppet-enterprise' do
-        expect do
-          subject.upload_payloads(
-            @scp_mock,
-            :install_script => 'puppet-enterprise',
-            :installer_answers => 'foo'
-          )
-        end.should raise_error Exception, /Must specify installer payload/
-      end
-      it 'should require installer answers when install-script is puppet-enterprise' do
-        expect do
-          subject.upload_payloads(
-            @scp_mock,
-            :install_script => 'puppet-enterprise',
-            :installer_payload => 'foo'
-          )
-        end.should raise_error Exception, /Must specify .*? answers file/
-      end
     end
     describe '#compile_template' do
       it 'should be able to compile a template' do
