@@ -425,7 +425,7 @@ module Puppet::CloudPack
           This option allows you to specify an optional puppet agent
           certificate name to configure on the target system.  This option
           applies to the puppet-enterprise and puppet-enterprise-http
-          installation scripts.  If provided, this option will replace any
+          installer scripts.  If provided, this option will replace any
           puppet agent certificate name provided in the puppet enterprise
           answers file.  This certificate name will show up in the console (or
           Puppet Dashboard) when the agent checks in for the first time.
@@ -433,12 +433,35 @@ module Puppet::CloudPack
       end
 
       action.option '--install-script=' do
-        summary 'The method to use when installing Puppet.'
+        summary 'The script to use when installing Puppet.'
         description <<-EOT
-          Name of the installation template to use when installing Puppet. The current
-          list of supported templates is: gems, puppet-enterprise
+          Name of the installer script template to use when installing Puppet.
+          The current list of supported scripts is:
+            #{Puppet::CloudPack::Installer.find_builtin_templates.sort.join("\n            ")}
         EOT
-        default_to { 'puppet-community' }
+        default_to { 'puppet-enterprise' }
+        before_action do |action, arguments, options|
+          # Check that the we can find the install script template.
+          Puppet::CloudPack::Installer.find_template(options[:install_script])
+
+          # Check that we have all the necessary inputs depending on the
+          # install script specified.
+          if options[:install_script].start_with?('puppet-enterprise')
+            if options[:install_script].length == 'puppet-enterprise'.length
+              # The canonical PE install script ('puppet-enterprise') needs both:
+              # the installer payload and an answers file.
+              unless options[:installer_payload] and options[:installer_answers]
+                raise ArgumentError, 'Must specify installer payload and answers file if install script is puppet-enterprise'
+              end
+            elsif options[:install_script]['puppet-enterprise'.length, 1] == '-'
+              # Other PE install scripts (those starting with 'puppet-enterprise-'),
+              # need an answers file.
+              unless options[:installer_answers]
+                raise ArgumentError, "Must specify an answers file for install script #{options[:install_script]}"
+              end
+            end
+          end
+        end
       end
 
       action.option '--puppet-version=' do
@@ -831,7 +854,7 @@ module Puppet::CloudPack
       install_command = "#{cmd_prefix}bash -c 'chmod u+x #{remote_script_path}; #{remote_script_path}'"
       results = ssh_remote_execute(server, options[:login], install_command, options[:keyfile])
       if results[:exit_code] != 0 then
-        raise Puppet::Error, "The installation script exited with a non-zero exit status, indicating a failure.  It may help to run with --debug to see the script execution or to check the installation log file on the remote system in #{options[:tmp_dir]}."
+        raise Puppet::Error, "The installer script exited with a non-zero exit status, indicating a failure.  It may help to run with --debug to see the script execution or to check the installation log file on the remote system in #{options[:tmp_dir]}."
       end
 
       # At this point we may assume installation of Puppet succeeded since the
@@ -945,20 +968,6 @@ module Puppet::CloudPack
     end
 
     def upload_payloads(scp, options)
-
-      if options[:install_script] == 'puppet-enterprise'
-        unless options[:installer_payload] and options[:installer_answers]
-          raise 'Must specify installer payload and answers file if install script if puppet-enterprise'
-        end
-      end
-
-      # Puppet enterprise install scripts, even those using S3, need and installer answers file.
-      if options[:install_script] =~ /^puppet-enterprise-/
-        unless options[:installer_answers]
-          raise "Must specify an answers file for install script #{options[:install_script]}"
-        end
-      end
-
       if options[:installer_payload] and payload_type(options[:installer_payload]) == :file_path
         Puppet.notice "Uploading Puppet Enterprise tarball ..."
         scp.upload(options[:installer_payload], "#{options[:tmp_dir]}/puppet.tar.gz")
@@ -978,7 +987,7 @@ module Puppet::CloudPack
       options[:environment] = Puppet[:environment] || 'production'
 
       install_script = Puppet::CloudPack::Installer.build_installer_template(options[:install_script], options)
-      Puppet.debug("Compiled installation script:")
+      Puppet.debug("Compiled installer script:")
       Puppet.debug(install_script)
 
       # create a temp file to write compiled script
