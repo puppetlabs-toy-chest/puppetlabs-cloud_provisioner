@@ -113,11 +113,31 @@ module Puppet::CloudPack
         options[:security_group] = options[:security_group].split(File::PATH_SEPARATOR)
       end
 
-      known = Puppet::CloudPack.create_connection(options).security_groups
-      unknown = options[:security_group].select { |g| known.get(g).nil? }
+      known_by_id = {}
+      known_by_name = {}
+      Puppet::CloudPack.create_connection(options).security_groups.each do |g|
+        known_by_id[g.group_id] = g
+        known_by_name[g.name] = g
+      end
+      known = {}
+      unknown = []
+      options[:security_group].each do |g|
+        # look up the group by its ID first, if not found then by name
+        if sg = known_by_id[g] || sg = known_by_name[g]
+          # store the group_id as a key in a hash to eliminate duplicates
+          known[sg.group_id] = known.size unless known.include?(sg.group_id)
+        else
+          unknown << g
+        end
+      end
       unless unknown.empty?
         raise ArgumentError, "Unrecognized security groups: #{unknown.join(', ')}"
       end
+      # now rebuild the security_group option argument array from the 'known' hash
+      # so that every group in the array is specified by its ID, there are no
+      # duplicates and the order of the groups in the array is the same as the order
+      # in which the groups were specified on the command line
+      options[:security_group] = known.keys.sort { |l, r| known[l] <=> known[r] }
     end
 
     def add_create_options(action)
@@ -238,7 +258,8 @@ module Puppet::CloudPack
           security group determines the rules for both inbound and outbound
           connections.
 
-          Multiple groups can be specified as a colon-separated list.
+          Multiple groups can be specified as a colon-separated list. The
+          groups can be specified by names or IDs.
         EOT
         before_action do |action, args, options|
           Puppet::CloudPack.group_option_before_action(options)
@@ -651,13 +672,13 @@ module Puppet::CloudPack
 
       # TODO: Validate that the security groups permit SSH access from here.
       # TODO: Can this throw errors?
-      server     = create_server(connection.servers,
-        :image_id   => options[:image],
-        :key_name   => options[:keyname],
-        :groups     => options[:security_group],
-        :flavor_id  => options[:type],
-        :subnet_id     => options[:subnet],
-        :availability_zone => options[:availability_zone]
+      server = create_server(connection.servers,
+        :image_id           => options[:image],
+        :key_name           => options[:keyname],
+        :security_group_ids => options[:security_group],
+        :flavor_id          => options[:type],
+        :subnet_id          => options[:subnet],
+        :availability_zone  => options[:availability_zone]
       )
 
       # This is the earliest point we have knowledge of the instance ID
