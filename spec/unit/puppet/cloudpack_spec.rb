@@ -479,7 +479,7 @@ describe Puppet::CloudPack do
           subject.expects(:http_request).with() do |http, path, options, action, expected_code, data|
             path == '/node_groups.json' && action =~ /list groups/i
           end.returns(response_node_groups_does_not_exist)
-          expect { subject.classify('certname', options) }.should raise_error(Puppet::Error, /Groups must exist before they can be assigned to nodes/)
+          expect { subject.classify('certname', options) }.to raise_error(Puppet::Error, /Groups must exist before they can be assigned to nodes/)
         end
       end
     end
@@ -490,7 +490,7 @@ describe Puppet::CloudPack do
         http_mock
       end
       it 'should fail on unexpected http response codes' do
-        expect { Puppet::CloudPack.handle_json_response(http_fail, 'Action', expected_code='200') }.should raise_error(Puppet::Error, /Could not: Action/)
+        expect { Puppet::CloudPack.handle_json_response(http_fail, 'Action', expected_code='200') }.to raise_error(Puppet::Error, /Could not: Action/)
       end
     end
     describe '#ssh_connect' do
@@ -534,11 +534,11 @@ describe Puppet::CloudPack do
       describe 'with general Exception failures' do
         it 'should not be tolerant of intermittent errors' do
           Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Exception, 'some error').then.returns(true)
-          expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.should raise_error(Exception, 'some error')
+          expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.to raise_error(Exception, 'some error')
         end
         it 'should fail eventually ' do
           Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Exception, 'some error')
-          expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.should raise_error(Exception, 'some error')
+          expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.to raise_error(Exception, 'some error')
         end
       end
     end
@@ -572,24 +572,6 @@ describe Puppet::CloudPack do
             {:installer_payload => url, :tmp_dir => '/tmp'}
           )
         end
-      end
-      it 'should require installer payload when install-script is puppet-enterprise' do
-        expect do
-          subject.upload_payloads(
-            @scp_mock,
-            :install_script => 'puppet-enterprise',
-            :installer_answers => 'foo'
-          )
-        end.should raise_error Exception, /Must specify installer payload/
-      end
-      it 'should require installer answers when install-script is puppet-enterprise' do
-        expect do
-          subject.upload_payloads(
-            @scp_mock,
-            :install_script => 'puppet-enterprise',
-            :installer_payload => 'foo'
-          )
-        end.should raise_error Exception, /Must specify .*? answers file/
       end
     end
     describe '#compile_template' do
