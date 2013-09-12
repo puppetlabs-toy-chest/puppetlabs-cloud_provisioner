@@ -1,3 +1,15 @@
+Thu Sep 12 2013 Melissa Stone 1.0.9
+ * PE-1178: --security-group option handling improvements
+ * PE-1504: drop ruby 1.8.7 and add ruby 2.0.0 to the projects's travis-ci matrix
+ * PE-838: default to installing PE during bootstrap
+ * PE-838: update rspec syntax to kill deprecation warnings
+ * PE-838: update tests for the change in the install script default
+ * PE-838: default to installing PE during bootstrap
+ * PE-1504: drop ruby 1.8.7 and add ruby 2.0.0 to the projects's travis-ci matrix
+ * PE-1178: updated tests for the --security-group option handling
+ * PE-1178: --security-group option handling improvements
+ * PE-830: update doc of puppet node install --installer-payload option
+
 Mon Aug 05 2013 Matthaus Owens 1.0.8
  * PE-834, PE-424: remove extra whitespace
  * PE-834, PE-424: remove unused test code pieces
