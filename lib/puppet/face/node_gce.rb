@@ -31,9 +31,7 @@ Puppet::Face.define(:node_gce, '1.0.0') do
     when_invoked do |client_id, client_secret, options|
       require 'puppet/google_api'
 
-      api = Puppet::GoogleAPI.new(client_id, client_secret)
-
-      drive = api.discovered_api('compute', 'v1beta15') or
+      Puppet::GoogleAPI.new(client_id, client_secret).discover('compute', 'v1beta15') or
         raise "unable to discover the GCE v1beta15 API"
 
       true
@@ -44,6 +42,50 @@ Puppet::Face.define(:node_gce, '1.0.0') do
         'Registration was successful, and the GCE API is available'
       else
         'Registration failed, or the GCE API was not available'
+      end
+    end
+  end
+
+
+  action :list do
+    summary 'List GCE compute instances'
+    description <<-EOT
+      List GCE compute instances.
+
+      This provides a list of GCE compute instances for the selected project.
+    EOT
+
+    option '--project SCP-1125' do
+      summary 'The project to list instances from'
+      required
+    end
+
+    option '--zone us-central1-a' do
+      summary 'Limit to instances in the specified zone'
+    end
+
+    when_invoked do |options|
+      require 'puppet/google_api'
+      api = Puppet::GoogleAPI.new
+
+      if options[:zone]
+        api.compute.instances.list(options[:project], options[:zone])
+      else
+        api.compute.instances.aggregated_list(options[:project])
+      end
+    end
+
+    when_rendering :console do |output|
+      if output.is_a? Hash
+        output.map do |key, value|
+          if value.empty?
+            "#### zone: #{key}\n<no instances in zone>\n"
+          else
+            "#### zone: #{key}\n" + value.map(&:to_s).join("\n\n") + "\n"
+          end
+        end.join("\n")
+      else
+        output.join("\n\n")
       end
     end
   end

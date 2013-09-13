@@ -2,17 +2,12 @@ require 'puppet'
 require 'google/api_client'
 
 require 'pathname'
-require 'forwardable'
 
 # A helper to capture logic around authentication and interaction with the
 # Google API, especially around authentication with the OAuth2 system.
 #
 # @api private
 class Puppet::GoogleAPI
-  extend Forwardable
-
-  def_delegators :client, :discovered_api
-
   # Create a new instance; this will implicitly authorize if required, or
   # otherwise refresh the access token.  It makes state changes in the rest of
   # the system -- potentially storing the refresh token in the statedir, or
@@ -39,6 +34,87 @@ class Puppet::GoogleAPI
   # supply as required -- and if not, the user should call `register` at the
   # face level and provide them.  Don't routinely supply these data.
   def initialize(client_id = nil, client_secret = nil)
+    # First, load our state from disk if it is available.
+    load_state!
+
+    # ...and now try and authenticate with the server; this will request
+    # authorization if required.
+    authenticate!(client_id, client_secret)
+  end
+
+  def discover(name, version)
+    # @todo danielp 2013-09-13: we should cache the discovery document and
+    # reuse it if it is fresh enough here; see
+    # https://code.google.com/p/google-api-ruby-client/#APIs_Discovery_Service
+    # for an example of the `register_discovery_document`; basically, cache
+    # the "discovery document" hash to disk, and feed it through that.
+    #
+    # Right now we take the hit of a full HTTP fetch for every discovery which
+    # is going to be heavier and slower than we ultimately want in production.
+    client.discovered_api(name, version)
+  end
+
+  def execute(method, parameters = {})
+    # We have to do our own handling, as the execute! method -- which throws
+    # great errors most of the time -- doesn't have anything to support 401
+    # specially, and worse, doesn't have suitable hooks to allow us to stash
+    # away our auth state if and only if it changed.
+    result = client.execute(:api_method => method, :parameters => parameters)
+    if result.status == 401     # reauthenticate and retry
+      authenticate!
+      execute(method, parameters)
+    elsif result.status != 200
+      raise "#{method} failed #{result.status}: #{result.error_message || 'unknown error'}"
+    end
+
+    # We return the data content; that includes support for fetching further
+    # pages, which we handle here, returning an array of one or more bodies to
+    # the caller.
+    if result.data.respond_to?('next_page_token')
+      # We might have multiple pages of results, collect them all, and return
+      # them in an array of multiple items.  Since they potentially have
+      # specialized item storage formats by type, we can't generically do
+      # anything to vivify the final object format.
+      page = result.data
+      results = []
+      while page do
+        results << page
+        page = page.next_page_token ? page.next_page : nil
+      end
+      results
+    else
+      # Just return the single result, in an array, to match the API with the
+      # paged data above.
+      #
+      # @todo danielp 2013-09-16: it isn't clear this is needed, since we
+      # already need specialized knowledge in the caller, but ...
+      [result.data]
+    end
+  end
+
+  def compute
+    @compute ||= Puppet::GoogleAPI::Compute.new(self)
+  end
+
+
+  # A helper to render a hash as human-focused text
+  #
+  # @todo danielp 2013-09-16: I don't like putting this here, but there
+  # doesn't seem to be anywhere better, and Puppet doesn't offer
+  # the capability.  The default behaviour is "render as a human-hostile JSON
+  # string", so that won't do either.  Oh, well.
+  def self.hash_to_human_s(hash)
+    keylen = hash.keys.map{|k| k.to_s.length}.max
+    hash.map do |key, value|
+      key.to_s.rjust(keylen) + ': ' +
+        value.to_s.gsub("\n", "\n#{' ' * (keylen + 2)}")
+    end.join("\n")
+  end
+
+  ########################################################################
+  private
+
+  def authenticate!(client_id = nil, client_secret = nil)
     # Process:
     # 1. Try and load credentials from disk, and see if the auth token is
     #    still valid.
@@ -46,9 +122,6 @@ class Puppet::GoogleAPI
     # 3. If we got registration details, request auth via the browser and
     #    stash away the tokens we got in return.
     # 4. Fail with an informative message asking the user to register.
-
-    # First, load our state from disk if it is available.
-    load_state!
 
     # Next, see if we have an access token.  If we do, and it has not expired,
     # life is simple and we just stop.  We can make requests right now.  (The
@@ -127,9 +200,6 @@ EOT
     # the user about what went wrong and just give it up.
     raise "No GCE credentials available; please `puppet node_gce register` with the GCE console"
   end
-
-
-  private
 
   def client
     @client ||= Google::APIClient.new(
@@ -217,26 +287,6 @@ EOT
 
     Puppet::Util.replace_file(state_file, 0600) {|fh| fh.puts(data.to_pson) }
   end
-
-  def save_authorization(auth)
-    raise "@todo danielp 2013-09-12: finish this"
-  end
-
-  def request_authorization(auth)
-    raise "@todo danielp 2013-09-12: finish this"
-
-    client  = Google::APIClient.new(
-      :application_name    => 'Puppet Cloud Provisioner',
-      :application_version => '1.0.0'
-      )
-    flow    = Google::APIClient::InstalledAppFlow.new(
-      :client_id           => client_id,
-      :client_secret       => client_secret,
-      :scope               => 'https://www.googleapis.com/auth/compute'
-      )
-
-    client.authorization = flow.authorize
-
-    compute = client.discovered_api('compute', 'v1beta15')
-  end
 end
+
+require 'puppet/google_api/compute'
