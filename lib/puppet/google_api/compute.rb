@@ -89,6 +89,13 @@ class Puppet::GoogleAPI::Compute
       end
     end
 
+    def get(project, zone, name)
+      args = {project: project, zone: zone, instance: name}
+      @api.execute(@compute.instances.get, args).first
+    rescue
+      nil
+    end
+
     def list(project, zone)
       instances = @api.execute(@compute.instances.list, project: project, zone: zone)
       # Turn our collection of pages into a single, flat collection; we don't
@@ -184,6 +191,25 @@ class Puppet::GoogleAPI::Compute
     def delete(project, zone, name, options)
       params = {project: project, zone: zone, instance: name}
       result = @api.execute(@compute.instances.delete, params).first
+      while options[:wait] and result.status != 'DONE'
+        # I wonder if I should show some sort of progress bar...
+        sleep 1
+        result = @api.compute.zone_operations.get(project, zone, result.name)
+      end
+
+      return result
+    end
+
+    def set_metadata(project, zone, name, fingerprint, metadata, options)
+      params = {project: project, zone: zone, instance: name}
+      body = {
+        fingerprint: [fingerprint].pack('m'),
+        items: metadata.inject([]) do |array, (key, value)|
+          array << {key: key, value: value}
+        end
+      }
+
+      result = @api.execute(@compute.instances.set_metadata, params, body).first
       while options[:wait] and result.status != 'DONE'
         # I wonder if I should show some sort of progress bar...
         sleep 1
