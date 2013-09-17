@@ -180,6 +180,18 @@ class Puppet::GoogleAPI::Compute
 
       return result
     end
+
+    def delete(project, zone, name, options)
+      params = {project: project, zone: zone, instance: name}
+      result = @api.execute(@compute.instances.delete, params).first
+      while options[:wait] and result.status != 'DONE'
+        # I wonder if I should show some sort of progress bar...
+        sleep 1
+        result = @api.compute.zone_operations.get(project, zone, result.name)
+      end
+
+      return result
+    end
   end
 
 

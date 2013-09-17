@@ -172,4 +172,54 @@ Puppet::Face.define(:node_gce, '1.0.0') do
       end
     end
   end
+
+
+  action :delete do
+    summary 'delete an existing GCE compute instance'
+    description <<-EOT
+      Delete an existing GCE computer instance.
+
+      This starts the process of deleting the instance, which happens
+      in the background, and optionally waits for completion.
+    EOT
+
+    arguments '<name>'
+
+    option '--project SCP-1125' do
+      summary 'The project to list instances from'
+      required
+    end
+
+    option '--zone us-central1-a' do
+      summary 'Limit to instances in the specified zone'
+      default_to { 'us-central1-a' }
+    end
+
+    option '--[no-]wait' do
+      summary 'wait for instance creation to complete before returning'
+      default_to { true }
+    end
+
+    when_invoked do |name, options|
+      require 'puppet/google_api'
+      api = Puppet::GoogleAPI.new
+
+      api.compute.instances.delete(options[:project], options[:zone], name, options)
+    end
+
+    when_rendering :console do |result|
+      if result.error
+        # @todo danielp 2013-09-17: untested
+        result.error.errors.each do |msg|
+          Puppet.error(msg.message || msg.code)
+        end
+      else
+        (result.warnings || []).each do |msg|
+          Puppet.warning(msg.message || msg.code)
+        end
+
+        "Deleting the VM is #{result.status.downcase}"
+      end
+    end
+  end
 end
