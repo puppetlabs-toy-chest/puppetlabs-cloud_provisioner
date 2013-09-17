@@ -8,6 +8,14 @@ require 'pathname'
 #
 # @api private
 class Puppet::GoogleAPI
+  # The list of "standard" projects to search for images when hunting by name;
+  # the Google supplied images live in these.
+  StandardImageProjects  = ['debian-cloud', 'centos-cloud']
+
+  # The list of "standard" projects to search for kernels when hunting by
+  # name; the Google supplied kernels live in these.
+  StandardKernelProjects = ['google']
+
   # Create a new instance; this will implicitly authorize if required, or
   # otherwise refresh the access token.  It makes state changes in the rest of
   # the system -- potentially storing the refresh token in the statedir, or
@@ -54,16 +62,24 @@ class Puppet::GoogleAPI
     client.discovered_api(name, version)
   end
 
-  def execute(method, parameters = {})
+  def execute(method, parameters = {}, body = nil)
     # We have to do our own handling, as the execute! method -- which throws
     # great errors most of the time -- doesn't have anything to support 401
     # specially, and worse, doesn't have suitable hooks to allow us to stash
     # away our auth state if and only if it changed.
-    result = client.execute(:api_method => method, :parameters => parameters)
+    args = {
+      :api_method  => method,
+      :parameters  => parameters,
+      :body_object => body
+    }
+    result = client.execute(args)
     if result.status == 401     # reauthenticate and retry
       authenticate!
       execute(method, parameters)
     elsif result.status != 200
+      # @todo danielp 2013-09-17: I am thinking that maybe a 404 result should
+      # return either an empty array (for convenience in punning) or nil,
+      # since that is a more "normal" failure than any of the alternatives...
       raise "#{method} failed #{result.status}: #{result.error_message || 'unknown error'}"
     end
 

@@ -89,4 +89,87 @@ Puppet::Face.define(:node_gce, '1.0.0') do
       end
     end
   end
+
+
+  action :create do
+    summary 'create a new GCE compute instance'
+    description <<-EOT
+      Create a new GCE computer instance.
+
+      This starts the process of creating a new instance, which happens
+      in the background, and optionally waits for completion.
+    EOT
+
+    arguments '<name> <type>'
+
+    option '--project SCP-1125' do
+      summary 'The project to list instances from'
+      required
+    end
+
+    option '--zone us-central1-a' do
+      summary 'Limit to instances in the specified zone'
+      default_to { 'us-central1-a' }
+    end
+
+    option '--image <name|url>' do
+      summary 'the disk image name, or full URL, to boot from'
+      required
+    end
+
+    option '--image-search <projects>' do
+      summary 'the additional projects to search for images by name'
+      description <<-EOT
+        The additional projects to search for images by name.
+
+        Google Compute supplies a number of default images, but they live
+        in their own little world -- distinct projects.  This allows you to
+        set the search path for images specified by name.
+
+        It should be a colon separated list of projects.
+      EOT
+
+      default_to do
+        require 'puppet/google_api'
+        Puppet::GoogleAPI::StandardImageProjects.join(':')
+      end
+
+      before_action do |action, args, options|
+        # Fun times, but for consistency to the user...
+        options[:image_search] = options[:image_search].split(':')
+      end
+    end
+
+    option '--[no-]wait' do
+      summary 'wait for instance creation to complete before returning'
+      default_to { true }
+    end
+
+    # @todo danielp 2013-09-16: we should support network configuration, but
+    # for now ... we don't.  Sorry.  Best of luck.
+
+    when_invoked do |name, type, options|
+      require 'puppet/google_api'
+      api = Puppet::GoogleAPI.new
+
+      api.compute.instances.create(options[:project], options[:zone], name, type, options)
+    end
+
+    when_rendering :console do |result|
+      if result.error
+        # @todo danielp 2013-09-17: untested
+        result.error.errors.each do |msg|
+          Puppet.err(msg.message || msg.code)
+        end
+
+        "Creating the VM failed"
+      else
+        (result.warnings || []).each do |msg|
+          Puppet.warning(msg.message || msg.code)
+        end
+
+        "Creating the VM is #{result.status.downcase}"
+      end
+    end
+  end
 end

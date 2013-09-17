@@ -122,5 +122,135 @@ class Puppet::GoogleAPI::Compute
 
       instances
     end
+
+    def create(project, zone, name, type, options)
+      params = {project: project, zone: zone}
+      body   = {name: name,}
+
+      if machine_type = @api.compute.machine_types.get(project, zone, type)
+        body[:machineType] = machine_type.self_link
+      else
+        raise "machine type #{type} not found in project #{project} zone #{zone}"
+      end
+
+      case options[:image]
+      when /^https?:/i
+        # The rest of the system will error-check the URL you supplied.
+        body[:image] = options[:image]
+
+      when String
+        image = nil
+        ([project] + options[:image_search]).each do |where|
+          image = @api.compute.images.get(where, options[:image])
+          break if image
+        end
+
+        image or
+          raise "unable to find the image '#{options[:image]}' for #{project}"
+
+        body[:image] = image.self_link
+
+      else
+        raise "the boot image must be either a full HTTP URL, or an image name"
+      end
+
+      # @todo danielp 2013-09-17: we don't support network configuration
+      # outside this fixed-in-place default.  Good luck.
+      body[:networkInterfaces] = [{
+          # @todo danielp 2013-09-17: this just assumes the network exists.
+          # Eventually we need to fix that to allow some real network config,
+          # and also to error-check this fetch.
+          network: @api.compute.networks.get(project, 'default').self_link,
+          # @todo danielp 2013-09-17: right now, we forcibly expose everything
+          # to the outside world.  In the longer term that should change (as
+          # best practice is to put *only* your front-end nodes on the
+          # Internet), but that requires (a) network configuration input, and
+          # (b) solving the problem of how to install Puppet on that node...
+          accessConfigs: [
+            {type: 'ONE_TO_ONE_NAT', name: 'external nat'}
+          ]
+      }]
+
+      result = @api.execute(@compute.instances.insert, params, body).first
+      while options[:wait] and result.status != 'DONE'
+        # I wonder if I should show some sort of progress bar...
+        sleep 1
+        result = @api.compute.zone_operations.get(project, zone, result.name)
+      end
+
+      return result
+    end
+  end
+
+
+  def machine_types
+    @machine_types ||= MachineTypes.new(@api, @compute)
+  end
+
+  class MachineTypes
+    def initialize(api, compute)
+      @api     = api
+      @compute = compute
+    end
+
+    def get(project, zone, name)
+      @api.execute(@compute.machine_types.get, project: project, zone: zone, machineType: name).first
+    rescue
+      nil
+    end
+  end
+
+  def images
+    @images ||= Images.new(@api, @compute)
+  end
+
+  class Images
+    def initialize(api, compute)
+      @api     = api
+      @compute = compute
+    end
+
+    def get(project, name)
+      @api.execute(@compute.images.get, project: project, image: name).first
+    rescue
+      nil
+    end
+  end
+
+
+  def networks
+    @networks ||= Networks.new(@api, @compute)
+  end
+
+  class Networks
+    def initialize(api, compute)
+      @api     = api
+      @compute = compute
+    end
+
+    def get(project, name)
+      @api.execute(@compute.networks.get, project: project, network: name).first
+    rescue
+      nil
+    end
+  end
+
+
+  def zone_operations
+    @zone_operations ||= ZoneOperations.new(@api, @compute)
+  end
+
+  class ZoneOperations
+    def initialize(api, compute)
+      @api     = api
+      @compute = compute
+    end
+
+    def get(project, zone, name)
+      args = {project: project, zone: zone, operation: name}
+      @api.execute(@compute.zone_operations.get, args).first
+    rescue
+      nil
+    end
   end
 end
