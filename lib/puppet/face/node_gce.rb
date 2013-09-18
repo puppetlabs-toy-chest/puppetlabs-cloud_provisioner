@@ -1,4 +1,5 @@
 require 'puppet/face'
+require 'pathname'
 
 Puppet::Face.define(:node_gce, '1.0.0') do
   copyright "Puppet Labs", 2013
@@ -137,6 +138,61 @@ Puppet::Face.define(:node_gce, '1.0.0') do
       before_action do |action, args, options|
         # Fun times, but for consistency to the user...
         options[:image_search] = options[:image_search].split(':')
+      end
+    end
+
+    option '--login <username>', '-l <username>', '--username <username>' do
+      summary 'The login user to create on the target system.'
+      description <<-EOT
+        The login user to create on the target system.  This, along with the
+        SSH public key, is added to the instance metadata -- which in turn will
+        cause the Google supplied scripts to create the appropriate account
+        on the instance.
+      EOT
+    end
+
+    option '--key <keyname | path>' do
+      summary 'The SSH keypair name or file to install on the created user account.'
+      description <<-EOT
+        The SSH keypair name or file to install on the created user account.
+
+        The normal value is a keypair name -- relative to ~/.ssh -- that is used
+        to locate the private and public keys.  On the target system, only the
+        public key is stored.  The private key never leaves your machine.
+      EOT
+
+      default_to { 'id_rsa' }
+
+      before_action do |action, args, options|
+        # First, make sure the pathname is absolute; this turns relative names
+        # into names relative to the .ssh directory, but preserves an
+        # absolute path.
+        key = Pathname(options[:key]).expand_path('~/.ssh')
+
+        # Figure out if we got pointed to the public key; we keep this option
+        # pointing at the private key by convention.
+        if key.read =~ /PUBLIC KEY|^ssh-/ and key.extname.downcase == '.pub'
+          key = key.sub_ext('')
+        end
+
+        # Now, verify that we are pointed to a private key file.
+        unless key.read =~ /PRIVATE KEY/
+          raise <<EOT
+SSH keypair #{options[:key]} does not have private and public key data where I
+expect it to be, and I can't figure out how to locate the right parts.
+
+We assume that the private key material is in `.../example-key`, and that the
+public key material is in a corresponding `.../example-key.pub` file.
+
+If the option is relative, we assume the base directory is `~/.ssh`.
+
+Please point the key option at the private key file, and put the public key in
+place next to it with an additional `.pub` extension.
+EOT
+        end
+
+        # Finally, update the option to reflect our changes.
+        options[:key] = key.to_s
       end
     end
 

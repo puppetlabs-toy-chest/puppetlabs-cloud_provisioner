@@ -132,7 +132,7 @@ class Puppet::GoogleAPI::Compute
 
     def create(project, zone, name, type, options)
       params = {project: project, zone: zone}
-      body   = {name: name,}
+      body   = {name: name, metadata: {items: []}}
 
       if machine_type = @api.compute.machine_types.get(project, zone, type)
         body[:machineType] = machine_type.self_link
@@ -177,6 +177,16 @@ class Puppet::GoogleAPI::Compute
             {type: 'ONE_TO_ONE_NAT', name: 'external nat'}
           ]
       }]
+
+      if options[:login]
+        # @todo danielp 2013-09-18: I suspect that if you store your SSH
+        # public key in PEM format, bad things follow from this line!
+        keydata = Pathname(options[:key]).sub_ext('.pub').read
+        value = "#{options[:login]}:#{keydata}"
+
+        # Why didn't the just use a regular JSON object for this?  *sigh*
+        body[:metadata][:items] << {key: 'sshKeys', value: value}
+      end
 
       result = @api.execute(@compute.instances.insert, params, body).first
       while options[:wait] and result.status != 'DONE'
