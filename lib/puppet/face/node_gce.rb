@@ -279,4 +279,37 @@ Puppet::Face.define(:node_gce, '1.0.0') do
       Puppet::CloudPack.init(host, options)
     end
   end
+
+
+  action :ssh do
+    summary 'SSH to a GCE VM.'
+    arguments '<name>'
+    Puppet::CloudPack::GCE.options(self, :project, :zone, :login)
+
+    when_invoked do |name, options|
+      require 'puppet/google_api'
+      api = Puppet::GoogleAPI.new
+
+      instance = api.compute.instances.get(options[:project], options[:zone], name)
+      host = instance.network_interfaces.
+        map {|iface| iface.access_configs }.
+        flatten.
+        select {|config| config.nat_ip }.
+        first.nat_ip
+
+      ssh = %w[ssh -o UserKnownHostsFile=/dev/null -o CheckHostIP=no
+                   -o StrictHostKeyChecking=no -A -p 22]
+
+      # Add the specific SSH key, if the user gives us one.
+      options[:key] and ssh += ['-i', options[:key]]
+
+      # Build the target -- user ID if given, and target address
+      target = options[:login] ? "#{options[:login]}@" : ''
+      target += host
+      ssh << target
+
+      puts ssh.join(' ')
+      Process.exec *ssh
+    end
+  end
 end
