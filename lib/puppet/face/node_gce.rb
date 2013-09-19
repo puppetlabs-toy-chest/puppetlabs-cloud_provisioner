@@ -250,16 +250,33 @@ Puppet::Face.define(:node_gce, '1.0.0') do
 
     arguments '<name> <type>'
 
-    Puppet::CloudPack::GCE.options(self, :project, :zone, :wait)
+    Puppet::CloudPack::GCE.options(self, :project, :zone)
     Puppet::CloudPack::GCE.options(self, :image, :login)
+
+    # These are the non-AWS options used for installation.
+    Puppet::CloudPack.add_payload_options(self)
+    Puppet::CloudPack.add_classify_options(self)
 
     when_invoked do |name, type, options|
       require 'puppet/google_api'
       api = Puppet::GoogleAPI.new
 
-      require 'debugger'; debugger
-
+      # Because we are performing synchronous operations, we deliberately want
+      # to wait for each of them to complete before proceeding.
+      options.merge!(wait: true)
       api.compute.instances.create(options[:project], options[:zone], name, type, options)
+
+      # Figure out the host details, such as the public address.  Hope we have
+      # one, or this is going to be a short trip. ;)
+      instance = api.compute.instances.get(options[:project], options[:zone], name)
+      host = instance.network_interfaces.
+        map {|iface| iface.access_configs }.
+        flatten.
+        select {|config| config.nat_ip }.
+        first.nat_ip
+
+      # Next, install Puppet on the machine.
+      Puppet::CloudPack.init(host, options)
     end
   end
 end
