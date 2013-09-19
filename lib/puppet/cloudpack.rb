@@ -370,6 +370,10 @@ module Puppet::CloudPack
         end
       end
 
+      add_payload_options(action)
+    end
+
+    def add_payload_options(action)
       action.option '--installer-payload=' do
         summary 'The location of the gzipped Puppet Enterprise install tarball.'
         description <<-EOT
