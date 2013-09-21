@@ -1,3 +1,17 @@
+Fri Sep 20 2013 Moses Mendoza 1.1.0
+ * Implement `ssh` action to help ssh in to instances
+ * Implement bootstrapping of nodes with the GCE face.
+ * Extract "payload" options from other CloudPack install options
+ * Extract common options into a procedural library
+ * Move create operation in the file
+ * Implement SSH key / account support at create time
+ * Implement `user` action to manage ssh key metadata
+ * Implement `delete` operation for instances
+ * Implement basic `create` operation for instances
+ * Implement `list` operation for instances
+ * Add initial GCE support: Google API authentication
+ * Add `google-api-client` to the Gemfile
+
 Thu Sep 12 2013 Melissa Stone 1.0.9
  * PE-1178: --security-group option handling improvements
  * PE-1504: drop ruby 1.8.7 and add ruby 2.0.0 to the projects's travis-ci matrix
