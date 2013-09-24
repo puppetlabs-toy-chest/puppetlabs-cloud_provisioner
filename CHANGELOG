@@ -1,3 +1,7 @@
+Tue Sep 24 2013 Moses Mendoza 1.1.1
+* Support `google_compute_engine` ssh key by default
+* Make GCE image search list comma separated
+
 Fri Sep 20 2013 Moses Mendoza 1.1.0
  * Implement `ssh` action to help ssh in to instances
  * Implement bootstrapping of nodes with the GCE face.
