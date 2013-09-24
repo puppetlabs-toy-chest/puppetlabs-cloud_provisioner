@@ -41,7 +41,7 @@ module Puppet::CloudPack::GCE
       required
     end
 
-    to.option '--image-search <projects>' do
+    to.option '--image-search <project, project>' do
       summary 'the additional projects to search for images by name'
       description <<-EOT
         The additional projects to search for images by name.
@@ -50,17 +50,17 @@ module Puppet::CloudPack::GCE
         in their own little world -- distinct projects.  This allows you to
         set the search path for images specified by name.
 
-        It should be a colon separated list of projects.
+        It should be a comma separated list of projects.
       EOT
 
       default_to do
         require 'puppet/google_api'
-        Puppet::GoogleAPI::StandardImageProjects.join(':')
+        Puppet::GoogleAPI::StandardImageProjects.join(',')
       end
 
       before_action do |action, args, options|
         # Fun times, but for consistency to the user...
-        options[:image_search] = options[:image_search].split(':')
+        options[:image_search] = options[:image_search].split(',').map(&:strip)
       end
     end
   end
