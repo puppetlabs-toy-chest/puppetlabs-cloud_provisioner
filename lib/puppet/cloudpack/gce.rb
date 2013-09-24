@@ -86,7 +86,13 @@ module Puppet::CloudPack::GCE
         public key is stored.  The private key never leaves your machine.
       EOT
 
-      default_to { 'id_rsa' }
+      default_to do
+        if File.exist?('~/.ssh/google_compute_engine')
+          '~/.ssh/google_compute_engine'
+        else
+          'id_rsa'
+        end
+      end
 
       before_action do |action, args, options|
         # First, make sure the pathname is absolute; this turns relative names
