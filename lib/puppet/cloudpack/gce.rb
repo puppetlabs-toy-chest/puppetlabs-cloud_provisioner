@@ -87,8 +87,8 @@ module Puppet::CloudPack::GCE
       EOT
 
       default_to do
-        if File.exist?('~/.ssh/google_compute_engine')
-          '~/.ssh/google_compute_engine'
+        if Pathname('google_compute_engine').expand_path('~/.ssh').exist?
+          'google_compute_engine'
         else
           'id_rsa'
         end
