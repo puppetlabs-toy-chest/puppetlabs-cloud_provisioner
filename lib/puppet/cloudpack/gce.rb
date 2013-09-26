@@ -21,10 +21,10 @@ module Puppet::CloudPack::GCE
     end
   end
 
-  def add_zone(to)
+  def add_zone(to, with_default = true)
     to.option '--zone us-central1-a' do
       summary 'Limit to instances in the specified zone'
-      default_to { 'us-central1-a' }
+      with_default and default_to { 'us-central1-a' }
     end
   end
 

@@ -56,7 +56,10 @@ Puppet::Face.define(:node_gce, '1.0.0') do
       This provides a list of GCE compute instances for the selected project.
     EOT
 
-    Puppet::CloudPack::GCE.options(self, :project, :zone)
+    Puppet::CloudPack::GCE.options(self, :project)
+    # We can't have a default value for zone here, unlike every other
+    # operation that wants one.
+    Puppet::CloudPack::GCE.add_zone(self, false)
 
     when_invoked do |options|
       require 'puppet/google_api'
