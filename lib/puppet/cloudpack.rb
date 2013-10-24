@@ -727,13 +727,19 @@ module Puppet::CloudPack
       end
 
       # This is the earliest point we have knowledge of the DNS name
-      Puppet.notice("Server #{server.id} public dns name: #{server.dns_name}")
+      server_dns_name = server.dns_name
+
+      if server_dns_name.nil?
+        server_dns_name = server.private_dns_name
+      end
+
+      Puppet.notice("Server #{server.id} dns name: #{server_dns_name}")
 
       if options[:_destroy_server_at_exit] == :create
         options.delete(:_destroy_server_at_exit)
       end
 
-      return server.dns_name
+      return server_dns_name
     end
 
     def list_keynames(options = {})
