@@ -12,7 +12,6 @@ describe Puppet::Face[:node_aws, :current] do
 
   let :options do
     {
-      :platform => 'AWS',
       :image    => 'ami-12345',
       :type     => 'm1.small',
       :keyname  => 'some_keypair',
@@ -23,28 +22,6 @@ describe Puppet::Face[:node_aws, :current] do
   describe 'option validation' do
     before :each do
       Puppet::CloudPack.expects(:create).never
-    end
-
-    describe '(platform)' do
-      it 'should not require a platform' do
-        # create a connection before we start fiddling with the options
-        connection = Puppet::CloudPack.create_connection(options)
-        options.delete(:platform)
-        Puppet::CloudPack.expects(:create)
-        # Note that we need to provide the return value so that
-        # no exceptions are thrown from the code which calls
-        # the create_connection method and expects it to return
-        # something reasonable (i.e. non-nil)
-        Puppet::CloudPack.stubs(:create_connection).with() do |opts|
-          opts[:platform].should == 'AWS'
-        end.returns(connection)
-        subject.create(options)
-      end
-
-      it 'should validate the platform' do
-        options[:platform] = 'UnsupportedProvider'
-        expect { subject.create(options) }.to raise_error ArgumentError, /one of/
-      end
     end
 
     describe '(tags)' do
