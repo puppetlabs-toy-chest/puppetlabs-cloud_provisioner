@@ -62,7 +62,7 @@ describe Puppet::CloudPack do
       describe 'with valid arguments' do
         before :each do
           stub_console_output("pre\nec2: ####\nec2: PRINTS\nec2: ####\npost\n")
-          @result = subject.create(:platform => 'AWS', :image => 'ami-12345')
+          @result = subject.create(:image => 'ami-12345')
           @server = Fog::Compute.new(:provider => 'AWS').servers.first
         end
 
@@ -83,7 +83,6 @@ describe Puppet::CloudPack do
       describe 'when tags are not supported' do
         it 'should not add any tags' do
           subject.create(
-            :platform => 'AWS',
             :image => 'ami-12345',
             :tags_not_supported => true
           )
@@ -92,7 +91,7 @@ describe Puppet::CloudPack do
       end
 
       describe 'in exceptional situations' do
-        before(:all) { @options = { :platform => 'AWS', :image => 'ami-12345' } }
+        before(:all) { @options = { :image => 'ami-12345' } }
 
         subject { Puppet::CloudPack.create(@options) }
 
@@ -172,7 +171,7 @@ describe Puppet::CloudPack do
     describe '#list' do
       describe 'with valid arguments' do
         before :each do
-          subject.create(:platform => 'AWS', :image => 'ami-12345')
+          subject.create(:image => 'ami-12345')
           @result = subject.list(:platform => 'AWS')
         end
         it 'should not be empty' do
@@ -197,7 +196,7 @@ describe Puppet::CloudPack do
           @server = @servers.create(:image_id => '12345')
           # Commented because without a way to mock the busy wait on the console output,
           # these tests take WAY too long.
-          # @result = subject.fingerprint(@server.dns_name, :platform => 'AWS')
+          # @result = subject.fingerprint(@server.dns_name)
         end
         it 'should not be empty' do
           pending "Fog does not provide a mock Excon::Response instance with a non-nil body.  As a result we wait indefinitely in this test.  Pending a better way to test an instance with console output already available."
@@ -617,13 +616,13 @@ describe Puppet::CloudPack do
 
     describe '#create_connection' do
       it 'should create a new connection' do
-        Fog::Compute.expects(:new).with(:provider => 'SomeProvider')
-        subject.send :create_connection, :platform => 'SomeProvider'
+        Fog::Compute.expects(:new).with(:provider => 'AWS', :region => nil, :endpoint => nil)
+        subject.send :create_connection
       end
 
       it 'should create a connection with region when the provider is aws and region is set' do
         Fog::Compute.expects(:new).with(:provider => 'AWS', :region => 'us-east-1', :endpoint => nil)
-        subject.send :create_connection, :platform => 'AWS', :region => 'us-east-1'
+        subject.send :create_connection, :region => 'us-east-1'
       end
 
       it 'should create a connection with region and endpoint when the provider is aws and region and endpoint are set' do
@@ -633,18 +632,9 @@ describe Puppet::CloudPack do
           :endpoint => 'http://172.21.0.19:8773/services/Cloud'
         )
         subject.send(:create_connection,
-          :platform => 'AWS',
           :region => 'us-east-1',
           :endpoint => 'http://172.21.0.19:8773/services/Cloud'
         )
-      end
-
-      it 'should use auxiliary credentials' do
-        Fog.expects(:credential=).with(:SomeCredential)
-        Fog::Compute.expects(:new).with(:provider => 'SomeProvider')
-        subject.send :create_connection,
-          :platform    => 'SomeProvider',
-          :credentials => 'SomeCredential'
       end
     end
 
@@ -735,7 +725,6 @@ describe Puppet::CloudPack do
   describe 'option parsing helper functions' do
     before :each do
       @options = {
-        :platform => 'AWS',
         :image    => 'ami-12345',
         :type     => 'm1.small',
         :keypair  => 'some_keypair',

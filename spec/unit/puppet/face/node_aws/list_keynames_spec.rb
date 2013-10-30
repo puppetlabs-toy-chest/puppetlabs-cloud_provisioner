@@ -10,27 +10,11 @@ describe Puppet::Face[:node_aws, :current] do
 
   before :each do
     @options = {
-      :platform => 'AWS',
       :region   => 'us-east-1',
     }
   end
 
   describe 'option validation' do
-    describe '(platform)' do
-      it 'should not require a platform' do
-        @options.delete(:platform)
-        Puppet::CloudPack.stubs(:create_connection).with() do |options|
-          raise(Exception, "#{options[:platform] == 'AWS'}")
-        end
-        expect { subject.list_keynames(@options) }.to raise_error Exception, 'true'
-      end
-
-      it 'should validate the platform' do
-        @options[:platform] = 'UnsupportedProvider'
-        expect { subject.list_keynames(@options) }.to raise_error ArgumentError, /one of/
-      end
-    end
-
     describe '(region)' do
       it "should not require a region name" do
         @options.delete(:region)

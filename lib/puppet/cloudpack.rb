@@ -86,27 +86,6 @@ module Puppet::CloudPack
       end
     end
 
-    def add_platform_option(action)
-      add_credential_option(action)
-
-      action.option '--platform=' do
-        summary 'Platform used to create machine instance (only supports AWS).'
-        description <<-EOT
-          The Cloud platform used to create new machine instances.
-          Currently, AWS (Amazon Web Services) is the only supported platform.
-        EOT
-
-        default_to { 'AWS' }
-
-        before_action do |action, args, options|
-          supported_platforms = [ 'AWS' ]
-          unless supported_platforms.include?(options[:platform])
-            raise ArgumentError, "Platform must be one of the following: #{supported_platforms.join(', ')}"
-          end
-        end
-      end
-    end
-
     # JJM This method is separated from the before_action block to aid testing.
     def group_option_before_action(options)
       if not options[:security_group].is_a? Array
@@ -141,7 +120,6 @@ module Puppet::CloudPack
     end
 
     def add_create_options(action)
-      add_platform_option(action)
       add_region_option(action)
       add_availability_zone_option(action)
       add_tags_option(action)
@@ -268,17 +246,14 @@ module Puppet::CloudPack
     end
 
     def add_list_options(action)
-      add_platform_option(action)
       add_region_option(action)
     end
 
     def add_list_keynames_options(action)
-      add_platform_option(action)
       add_region_option(action)
     end
 
     def add_fingerprint_options(action)
-      add_platform_option(action)
       add_region_option(action)
     end
 
@@ -288,7 +263,6 @@ module Puppet::CloudPack
     end
 
     def add_terminate_options(action)
-      add_platform_option(action)
       add_region_option(action)
       action.option '--force', '-f' do
         summary 'Forces termination of an instance.'
@@ -669,9 +643,9 @@ module Puppet::CloudPack
         options[:_destroy_server_at_exit] = :create
       end
 
-      Puppet.info("Connecting to #{options[:platform]} #{options[:region]} ...")
+      Puppet.info("Connecting to AWS #{options[:region]} ...")
       connection = create_connection(options)
-      Puppet.info("Connecting to #{options[:platform]} #{options[:region]} ... Done")
+      Puppet.info("Connecting to AWS #{options[:region]} ... Done")
       Puppet.info("Instance Type: #{options[:type]}")
 
       # TODO: Validate that the security groups permit SSH access from here.
@@ -793,7 +767,7 @@ module Puppet::CloudPack
           # FIXME Where is the fingerprint?  Do we output it ever?
           { "#{myserver.id}" => myserver.console_output.body['output'].grep(/^ec2:/) }
         rescue Fog::Errors::Error => e
-          Puppet.warning("Waiting for SSH host key fingerprint from #{options[:platform]} ... Failed")
+          Puppet.warning "Waiting for SSH host key fingerprint from AWS ... Failed"
           Puppet.warning "Could not read the host's fingerprints"
           Puppet.warning "Please verify the host's fingerprints through the AWS console output"
         end
@@ -1030,9 +1004,9 @@ module Puppet::CloudPack
       # set the default id used for termination to dns_name
       options[:terminate_id] ||= 'dns-name'
 
-      Puppet.info "Connecting to #{options[:platform]} ..."
+      Puppet.info "Connecting to AWS ..."
       connection = create_connection(options)
-      Puppet.info "Connecting to #{options[:platform]} ... Done"
+      Puppet.info "Connecting to AWS ... Done"
 
       servers = connection.servers.all(options[:terminate_id] => server)
       if servers.length == 1 || options[:force]
@@ -1058,17 +1032,12 @@ module Puppet::CloudPack
       # the test pass by preventing Fog from throwing an error when the region
       # option is not expected
       Fog.credential = options[:credentials].to_sym if options[:credentials]
-      case options[:platform]
-      when 'AWS'
-        # fog is smart emough to pass options to that are set to nil
-        Fog::Compute.new(
-          :provider => options[:platform],
-          :region => options[:region],
-          :endpoint => options[:endpoint]
-        )
-      else
-        Fog::Compute.new(:provider => options[:platform])
-      end
+      # fog is smart enough to pass options that are set to nil
+      Fog::Compute.new(
+        :provider => 'AWS',
+        :region => options[:region],
+        :endpoint => options[:endpoint]
+      )
     end
 
     def create_server(servers, options = {})
