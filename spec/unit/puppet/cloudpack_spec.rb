@@ -520,7 +520,7 @@ describe Puppet::CloudPack do
           it 'should fail eventually' do
             pending "JJM: (#10172) This timeout causes the tests to run WAY too slow.  We need to mock this better.  This test also appears to be in the wrong describe block"
             Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Net::SSH::AuthenticationFailed, 'root')
-            expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.should raise_error(Puppet::CloudPack::Utils::RetryException::Timeout)
+            expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.to raise_error(Puppet::CloudPack::Utils::RetryException::Timeout)
           end
         end
         describe 'with Errno::ENETUNREACH' do
@@ -538,6 +538,12 @@ describe Puppet::CloudPack do
         it 'should fail eventually ' do
           Puppet::CloudPack.stubs(:ssh_remote_execute).raises(Exception, 'some error')
           expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.to raise_error(Exception, 'some error')
+        end
+      end
+      describe 'with persistent failures' do
+        it 'should report that the SSH connection establishment timed out' do
+          Puppet::CloudPack::Utils.expects(:retry_action).raises(Puppet::CloudPack::Utils::RetryException::Timeout)
+          expect { subject.ssh_test_connect('server', 'root', @keyfile.path) }.to raise_error(Puppet::CloudPack::InstanceErrorState, 'Timeout while establishing SSH connection to: server')
         end
       end
     end
