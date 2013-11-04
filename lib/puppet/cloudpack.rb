@@ -943,10 +943,15 @@ module Puppet::CloudPack
           Errno::ENETUNREACH             => "Network unreachable.  Retrying the connection...",
       }
 
-      Puppet::CloudPack::Utils.retry_action( :timeout => 250, :retry_exceptions => retry_exceptions ) do
-        Timeout::timeout(25) do
-          ssh_remote_execute(server, login, "date", keyfile)
+      begin
+        Puppet::CloudPack::Utils.retry_action( :timeout => 250, :retry_exceptions => retry_exceptions ) do
+          Timeout::timeout(25) do
+            ssh_remote_execute(server, login, "date", keyfile)
+          end
         end
+      rescue Utils::RetryException::Timeout
+        Puppet.notice "Waiting for SSH response ... Timeout"
+        raise Puppet::CloudPack::InstanceErrorState, "Timeout while establishing SSH connection to: #{server}"
       end
 
       Puppet.notice "Waiting for SSH response ... Done"
