@@ -1,12 +1,20 @@
+Wed Nov 27 2013 Moses Mendoza 1.1.5
+ * test to verify class names handling in retry_action
+ * handle class names in retry_exception hash correctly
+ * test for imporved SSH connection timeout handling
+ * improve SSH connection timeout handling
+ * remove references to the --platform option from the tests
+ * drop the --platform option
+
 Thu Sep 26 2013 Matthaus Owens 1.1.4
-* Make `zone` argument optional for listing GCE instances
+ * Make `zone` argument optional for listing GCE instances
 
 Thu Sep 26 2013 Matthaus Owens 1.1.3
-* Expand tildes in key path before testing for existence
+ * Expand tildes in key path before testing for existence
 
 Tue Sep 24 2013 Moses Mendoza 1.1.1
-* Support `google_compute_engine` ssh key by default
-* Make GCE image search list comma separated
+ * Support `google_compute_engine` ssh key by default
+ * Make GCE image search list comma separated
 
 Fri Sep 20 2013 Moses Mendoza 1.1.0
  * Implement `ssh` action to help ssh in to instances
