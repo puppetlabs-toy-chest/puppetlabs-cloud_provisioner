@@ -3,7 +3,7 @@ require 'puppet/google_api'
 class Puppet::GoogleAPI::Compute
   def initialize(api)
     @api     = api
-    @compute = api.discover('compute', 'v1beta15')
+    @compute = api.discover('compute', 'v1')
   end
 
   def instances
@@ -50,8 +50,7 @@ class Puppet::GoogleAPI::Compute
         # since that is required to see them -- and display a more
         # human-meaningful response.  (Possibly the object, possibly just the
         # name...)
-        text.merge!(type: machine_type, kernel: kernel)
-        image and text.merge!(image: image)
+        text.merge!(type: machine_type)
 
         # Networking details...
         #
@@ -143,7 +142,7 @@ class Puppet::GoogleAPI::Compute
       case options[:image]
       when /^https?:/i
         # The rest of the system will error-check the URL you supplied.
-        body[:image] = options[:image]
+        sourceImage = options[:image]
 
       when String
         image = nil
@@ -155,11 +154,38 @@ class Puppet::GoogleAPI::Compute
         image or
           raise "unable to find the image '#{options[:image]}' for #{project}"
 
-        body[:image] = image.self_link
+        sourceImage = image.self_link
 
       else
         raise "the boot image must be either a full HTTP URL, or an image name"
       end
+
+      # Attempt to first create the boot PD, then immediately fetch it
+      diskbody = {
+        name: name,
+        description: "Boot disk created from #{sourceImage}",
+      }
+      diskparams = {
+        project: project,
+        zone: zone,
+        sourceImage: sourceImage,
+      }
+      result = @api.execute(@compute.disks.insert, diskparams, diskbody).first
+      while result.status != 'DONE'
+        sleep 1
+        result = @api.compute.zone_operations.get(project, zone, result.name)
+      end
+      boot_pd = @api.compute.disks.get(project, zone, name)
+      boot_pd or
+        raise "error creating/fetching boot disk '#{name}'"
+
+      body[:disks] = [{
+        type: 'PERSISTENT',
+        boot: true,
+        mode: 'READ_WRITE',
+        deviceName: name,
+        source: boot_pd.self_link,
+      }]
 
       # @todo danielp 2013-09-17: we don't support network configuration
       # outside this fixed-in-place default.  Good luck.
@@ -200,14 +226,23 @@ class Puppet::GoogleAPI::Compute
 
     def delete(project, zone, name, options)
       params = {project: project, zone: zone, instance: name}
-      result = @api.execute(@compute.instances.delete, params).first
-      while options[:wait] and result.status != 'DONE'
+      iresult = @api.execute(@compute.instances.delete, params).first
+      while options[:wait] and iresult.status != 'DONE'
         # I wonder if I should show some sort of progress bar...
         sleep 1
-        result = @api.compute.zone_operations.get(project, zone, result.name)
+        iresult = @api.compute.zone_operations.get(project, zone, iresult.name)
       end
 
-      return result
+      # delete the boot persistent disk also
+      params = {project: project, zone: zone, disk: name}
+      dresult = @api.execute(@compute.disks.delete, params).first
+      while dresult.status != 'DONE'
+        # I wonder if I should show some sort of progress bar...
+        sleep 1
+        dresult = @api.compute.zone_operations.get(project, zone, dresult.name)
+      end
+
+      return iresult
     end
 
     def set_metadata(project, zone, name, fingerprint, metadata, options)
@@ -243,6 +278,23 @@ class Puppet::GoogleAPI::Compute
 
     def get(project, zone, name)
       @api.execute(@compute.machine_types.get, project: project, zone: zone, machineType: name).first
+    rescue
+      nil
+    end
+  end
+
+  def disks
+    @disks ||= Disks.new(@api, @compute)
+  end
+
+  class Disks
+    def initialize(api, compute)
+      @api     = api
+      @compute = compute
+    end
+
+    def get(project, zone, name)
+      @api.execute(@compute.disks.get, project: project, zone: zone, disk: name).first
     rescue
       nil
     end

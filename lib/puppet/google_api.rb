@@ -12,10 +12,6 @@ class Puppet::GoogleAPI
   # the Google supplied images live in these.
   StandardImageProjects  = ['debian-cloud', 'centos-cloud']
 
-  # The list of "standard" projects to search for kernels when hunting by
-  # name; the Google supplied kernels live in these.
-  StandardKernelProjects = ['google']
-
   # Create a new instance; this will implicitly authorize if required, or
   # otherwise refresh the access token.  It makes state changes in the rest of
   # the system -- potentially storing the refresh token in the statedir, or
