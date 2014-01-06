@@ -3,7 +3,7 @@ require 'puppet/google_api'
 class Puppet::GoogleAPI::Compute
   def initialize(api)
     @api     = api
-    @compute = api.discover('compute', 'v1beta15')
+    @compute = api.discover('compute', 'v1')
   end
 
   def instances

@@ -32,8 +32,8 @@ Puppet::Face.define(:node_gce, '1.0.0') do
     when_invoked do |client_id, client_secret, options|
       require 'puppet/google_api'
 
-      Puppet::GoogleAPI.new(client_id, client_secret).discover('compute', 'v1beta15') or
-        raise "unable to discover the GCE v1beta15 API"
+      Puppet::GoogleAPI.new(client_id, client_secret).discover('compute', 'v1') or
+        raise "unable to discover the GCE v1 API"
 
       true
     end
