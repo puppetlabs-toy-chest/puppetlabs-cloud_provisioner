@@ -844,10 +844,12 @@ module Puppet::CloudPack
 
       upload_payloads(connections[:scp], options)
 
-      tmp_script_path = compile_template(options)
-
+      tmp_script_tempfile = compile_template(options)
       remote_script_path = File.join(options[:tmp_dir], "#{options[:install_script]}.sh")
-      connections[:scp].upload(tmp_script_path, remote_script_path)
+      connections[:scp].upload(tmp_script_tempfile.path, remote_script_path)
+      # don't let the temporary file linger around
+      tmp_script_tempfile.unlink
+      tmp_script_tempfile = nil
 
       # Finally, execute the installer script
       install_command = "#{cmd_prefix}bash -c 'chmod u+x #{remote_script_path}; #{remote_script_path}'"
@@ -994,15 +996,12 @@ module Puppet::CloudPack
       Puppet.debug("Compiled installer script:")
       Puppet.debug(install_script)
 
-      # create a temp file to write compiled script
-      # return the path of the temp location of the script
-      begin
-        f = Tempfile.open('install_script')
-        f.write(install_script)
-        f.path
-      ensure
-        f.close
-      end
+      # create a tempfile and write the compiled script to it
+      # return the temfile instance
+      f = Tempfile.open('install_script')
+      f.write(install_script)
+      f.close
+      f
     end
 
     def terminate(server, options)
