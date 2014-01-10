@@ -3,7 +3,7 @@ require 'puppet/google_api'
 class Puppet::GoogleAPI::Compute
   def initialize(api)
     @api     = api
-    @compute = api.discover('compute', 'v1beta15')
+    @compute = api.discover('compute', 'v1')
   end
 
   def instances
@@ -50,8 +50,7 @@ class Puppet::GoogleAPI::Compute
         # since that is required to see them -- and display a more
         # human-meaningful response.  (Possibly the object, possibly just the
         # name...)
-        text.merge!(type: machine_type, kernel: kernel)
-        image and text.merge!(image: image)
+        text.merge!(type: machine_type)
 
         # Networking details...
         #
@@ -140,26 +139,18 @@ class Puppet::GoogleAPI::Compute
         raise "machine type #{type} not found in project #{project} zone #{zone}"
       end
 
-      case options[:image]
-      when /^https?:/i
-        # The rest of the system will error-check the URL you supplied.
-        body[:image] = options[:image]
-
-      when String
-        image = nil
-        ([project] + options[:image_search]).each do |where|
-          image = @api.compute.images.get(where, options[:image])
-          break if image
-        end
-
-        image or
-          raise "unable to find the image '#{options[:image]}' for #{project}"
-
-        body[:image] = image.self_link
-
-      else
-        raise "the boot image must be either a full HTTP URL, or an image name"
-      end
+      # GCE v1 API does not support Scratch disks, so here we create
+      # a persistent disk and register it for attachement to the instance.
+      # Note that we name the disk the same as the instance to be compatible
+      # with other tools.
+      boot_disk = @api.compute.disks.create(project, zone, name, options)
+      body[:disks] = [{
+        type: 'PERSISTENT',
+        source: boot_disk.targetLink,
+        mode: 'READ_WRITE',
+        deviceName: name,
+        boot: true
+      }]
 
       # @todo danielp 2013-09-17: we don't support network configuration
       # outside this fixed-in-place default.  Good luck.
@@ -199,12 +190,20 @@ class Puppet::GoogleAPI::Compute
     end
 
     def delete(project, zone, name, options)
+      instance = get(project, zone, name)
+
       params = {project: project, zone: zone, instance: name}
       result = @api.execute(@compute.instances.delete, params).first
       while options[:wait] and result.status != 'DONE'
         # I wonder if I should show some sort of progress bar...
         sleep 1
         result = @api.compute.zone_operations.get(project, zone, result.name)
+      end
+
+      # delete the instance's persistent boot disk (if any)
+      instance.disks.each do |disk|
+        next unless (disk.type == 'PERSISTENT' && disk.boot)
+        @api.compute.disks.delete(project, zone, File.basename(URI.parse(disk.source).path))
       end
 
       return result
@@ -265,6 +264,65 @@ class Puppet::GoogleAPI::Compute
     end
   end
 
+  def disks
+    @disks ||= Disks.new(@api, @compute)
+  end
+
+  class Disks
+    def initialize(api, compute)
+      @api     = api
+      @compute = compute
+    end
+
+    def create(project, zone, name, options)
+      params = {project: project, zone: zone}
+      body   = {name: name}
+
+      case options[:image]
+      when /^https?:/i
+        # The rest of the system will error-check the URL you supplied.
+        params[:sourceImage] = options[:image]
+
+      when String
+        image = nil
+        ([project] + options[:image_search]).each do |where|
+          image = @api.compute.images.get(where, options[:image])
+          break if image
+        end
+
+        image or
+          raise "unable to find the image '#{options[:image]}' for #{project}"
+
+        params[:sourceImage] = image.self_link
+      else
+        raise "the disk image must be either a full HTTP URL, or an image name"
+      end
+
+      body[:description] = 'Created from: ' + params[:sourceImage]
+
+      result = @api.execute(@compute.disks.insert, params, body).first
+      while result.status != 'DONE'
+        # I wonder if I should show some sort of progress bar...
+        sleep 1
+        result = @api.compute.zone_operations.get(project, zone, result.name)
+      end
+
+      result
+    end
+
+    def delete(project, zone, name)
+      params = {project: project, zone: zone, disk: name}
+
+      result = @api.execute(@compute.disks.delete, params).first
+      while result.status != 'DONE'
+        # I wonder if I should show some sort of progress bar...
+        sleep 1
+        result = @api.compute.zone_operations.get(project, zone, result.name)
+      end
+
+      result
+    end
+  end
 
   def networks
     @networks ||= Networks.new(@api, @compute)

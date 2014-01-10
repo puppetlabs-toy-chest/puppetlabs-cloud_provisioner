@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'template_helper'
 require 'puppet/cloudpack'
 require 'puppet/cloudpack/utils'
 
@@ -256,7 +257,7 @@ describe Puppet::CloudPack do
       it 'should set server as public_dns_name option' do
         subject.expects(:compile_template).with do |options|
           options[:public_dns_name] == @server
-        end
+        end.returns(mock('Tempfile', :path => nil, :unlink => nil))
         subject.install(@server, @options)
       end
     end
@@ -581,24 +582,13 @@ describe Puppet::CloudPack do
     end
     describe '#compile_template' do
       it 'should be able to compile a template' do
-        tmp_file = begin
-          tmp = Tempfile.open('foo')
-          tmp.write('Here is a <%= options[:variable] %>')
-          tmp.path
-        ensure
-          tmp.close
+        with_mock_user_template do |template_id|
+          @result = subject.compile_template(
+            :variable => 'variable',
+            :install_script => template_id
+          )
         end
-        tmp_filename = File.basename(tmp_file)
-        tmp_basedir = File.join(File.dirname(tmp_file), 'scripts')
-        tmp_file_real = File.join(tmp_basedir, "#{tmp_filename}.erb")
-        FileUtils.mkdir_p(tmp_basedir)
-        FileUtils.mv(tmp_file, tmp_file_real)
-        Puppet[:confdir] = File.dirname(tmp_file)
-        @result = subject.compile_template(
-          :variable => 'variable',
-          :install_script => tmp_filename
-        )
-        File.read(@result).should == 'Here is a variable'
+        File.read(@result.path).should == 'Here is a variable'
       end
     end
   end
