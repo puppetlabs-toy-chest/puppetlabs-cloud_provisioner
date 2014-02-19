@@ -13,6 +13,12 @@ baseurl = http://yum.puppetlabs.com/fedora/f$releasever/products/$basearch/
 gpgcheck = 1
 enabled = 1
 gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
+[puppetlabs-deps]
+name = Puppetlabs Dependencies
+baseurl = http://yum.puppetlabs.com/fedora/f$releasever/dependencies/$basearch/
+gpgcheck = 1
+enabled = 1
+gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
 EOFYUMREPO
 }
 
