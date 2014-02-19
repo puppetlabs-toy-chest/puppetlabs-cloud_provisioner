@@ -818,7 +818,8 @@ module Puppet::CloudPack
       # HACK: This should be reconciled with the Certificate Face.
       cert_options = {:ca_location => :remote}
 
-      # TODO: Wait for C.S.R.?
+      # TODO: Wait for C.S.R. properly?
+      sleep 3
 
       Puppet.notice "Signing certificate ..."
       begin
