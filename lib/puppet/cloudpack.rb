@@ -124,6 +124,7 @@ module Puppet::CloudPack
       add_availability_zone_option(action)
       add_tags_option(action)
       add_image_option(action)
+      add_volumesize_option(action)
       add_type_option(action)
       add_keyname_option(action)
       add_subnet_option(action)
@@ -177,6 +178,19 @@ module Puppet::CloudPack
           if Puppet::CloudPack.create_connection(options).images.get(options[:image]).nil?
             raise ArgumentError, "Unrecognized image name: #{options[:image]}"
           end
+        end
+      end
+    end
+
+    def add_volumesize_option(action)
+      action.option '--volumesize=' do
+        summary 'EBS boot volume size in GB.'
+        description <<-EOT
+          Most official AMIs are too small by default to hold all necessary software.
+          Use the option to extend boot volume at instance creation time.
+        EOT
+        before_action do |action, args, options|
+            raise ArgumentError, "Volume size must be greater or equal than 2GB: #{options[:volumesize]}" unless options[:volumesize].to_i >= 2
         end
       end
     end
@@ -652,6 +666,7 @@ module Puppet::CloudPack
       # TODO: Can this throw errors?
       server = create_server(connection.servers,
         :image_id           => options[:image],
+        :block_device_mapping => ( [{ :DeviceName => '/dev/sda1', 'Ebs.VolumeSize' => options[:volumesize] }] if options[:volumesize] ),
         :key_name           => options[:keyname],
         :security_group_ids => options[:security_group],
         :flavor_id          => options[:type],
