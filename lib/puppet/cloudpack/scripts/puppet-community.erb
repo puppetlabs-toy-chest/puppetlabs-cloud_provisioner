@@ -111,13 +111,13 @@ EOFPUPPETDEFAULT
 }
 
 function start_puppet() {
-  /etc/init.d/puppet start
+  puppet resource service puppet ensure=running enable=true
 }
 
 #This fuction is not called if no custom facts are given
 #
 #The Puppet Labs' stdlib module is required for this to work
-#It can be installed using: 
+#It can be installed using:
 # 'puppet-module install puppetlabs/stdlib'
 function facts_dot_d() {
   mkdir -p /etc/facter/facts.d
