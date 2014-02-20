@@ -123,6 +123,7 @@ module Puppet::CloudPack
       add_region_option(action)
       add_availability_zone_option(action)
       add_tags_option(action)
+      add_user_data_option(action)
       add_image_option(action)
       add_volumesize_option(action)
       add_type_option(action)
@@ -162,6 +163,17 @@ module Puppet::CloudPack
           end
         end
 
+      end
+    end
+
+    def add_user_data_option(action)
+      action.option '--user-data=' do
+        summary 'Instance User Data to set'
+        description <<-EOT
+          Set instance User Data that is later available as ec2_userdata fact and
+          also could be used to setup cloud-init, for example:
+          --user-data="$(echo -e '#cloud-config\\nwrite_files:\\n- path: /etc/facter/facts.d/role.txt\\n  content: role=broker')"
+        EOT
       end
     end
 
@@ -679,7 +691,8 @@ module Puppet::CloudPack
         :security_group_ids => options[:security_group],
         :flavor_id          => options[:type],
         :subnet_id          => options[:subnet],
-        :availability_zone  => options[:availability_zone]
+        :availability_zone  => options[:availability_zone],
+        :user_data          => options[:user_data]
       )
 
       # This is the earliest point we have knowledge of the instance ID
