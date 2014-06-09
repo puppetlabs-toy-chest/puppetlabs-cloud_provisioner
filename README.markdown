@@ -8,7 +8,7 @@ This module requires Puppet 2.7.2 or later.
 Getting Started
 ===============
 
- * [Getting Started With Cloud Provisioner](http://docs.puppetlabs.com/guides/cloud_pack_getting_started.html)
+ * [Getting Started With Cloud Provisioner](http://docs.puppetlabs.com/pe/latest/cloudprovisioner_overview.html)
 
 Reporting Issues
 ----------------
