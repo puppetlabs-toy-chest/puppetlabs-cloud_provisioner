@@ -495,9 +495,8 @@ module Puppet::CloudPack
       action.option '--enc-server=' do
         summary 'The external node classifier hostname.'
         description <<-EOT
-          The hostname of the external node classifier.  This currently only
-          supports Puppet Enterprise's console and Puppet Dashboard as external
-          node classifiers.
+          The hostname of the external node classifier. This currently only
+          supports Puppet Dashboard as the external node classifier.
         EOT
         default_to do
           Puppet[:server]
@@ -507,9 +506,8 @@ module Puppet::CloudPack
       action.option '--enc-port=' do
         summary 'The External Node Classifier Port.'
         description <<-EOT
-          The port of the External Node Classifier.  This currently only
-          supports Puppet Enterprise's console and Puppet Dashboard as external
-          node classifiers.
+          The port of the External Node Classifier. This currently only
+          supports Puppet Dashboard as the external node classifier.
         EOT
         default_to do 3000 end
       end
@@ -517,9 +515,9 @@ module Puppet::CloudPack
       action.option '--enc-auth-user=' do
         summary 'User name for authentication to the ENC.'
         description <<-EOT
-          PE's console and Puppet Dashboard can be secured using HTTP
-          authentication.  If the console or dashboard is configured with HTTP
-          authentication, use this option to supply credentials for accessing it.
+          Puppet Dashboard can be secured using HTTP authentication. If the
+          Puppet Dashboard is configured with HTTP authentication, use this
+          option to supply credentials for accessing it.
 
           Note: This option will default to the PUPPET_ENC_AUTH_USER
           environment variable.
@@ -530,9 +528,9 @@ module Puppet::CloudPack
       action.option '--enc-auth-passwd=' do
         summary 'Password for authentication to the ENC.'
         description <<-EOT
-          PE's console and Puppet Dashboard can be secured using HTTP
-          authentication.  If the console or dashboard is configured with HTTP
-          authentication, use this option to supply credentials for accessing it.
+          Puppet Dashboard can be secured using HTTP authentication. If the
+          Puppet Dashboard is configured with HTTP authentication, use this
+          option to supply credentials for accessing it.
 
           Note: This option will default to the PUPPET_ENC_AUTH_PASSWD
           environment variable.
@@ -543,7 +541,7 @@ module Puppet::CloudPack
       action.option '--node-group=', '--as=' do
         summary 'The ENC node group to associate the node with.'
         description <<-'EOT'
-          The PE console or Puppet Dashboard group to associate the node with.
+          The Puppet Dashboard group to associate the node with.
           The group must already exist in the ENC, or an error will be
           returned.  If the node has not been registered with the ENC, it will
           automatically be registered when assigning it to a group.
@@ -554,9 +552,6 @@ module Puppet::CloudPack
         summary 'Don\'t perform ENC SSL certificate verification'
         description <<-'EOT'
           Don't verify the SSL certificate when connecting to an ENC.
-          When connecting to the Puppet Enterprise Console, verification can be
-          optionally skipped as older versions of the PE Console used to use
-          certificates with a hardcoded Common Name which cannot be verified.
         EOT
         default_to { false }
       end
@@ -597,7 +592,7 @@ module Puppet::CloudPack
 
       # checking if the specified group even exists
       notfound_group_dne_error = lambda do
-        raise Puppet::Error, "Group #{options[:node_group]} does not exist in the console/Dashboard. Groups must exist before they can be assigned to nodes."
+        raise Puppet::Error, "Group #{options[:node_group]} does not exist in the dashboard. Groups must exist before they can be assigned to nodes."
       end
       node_groups = http_request(http, '/node_groups.json', options, 'List Groups')
       node_group_info = node_groups.find(notfound_group_dne_error) do |group|
