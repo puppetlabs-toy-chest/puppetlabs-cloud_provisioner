@@ -1,3 +1,6 @@
+Mon Mar 02 2014 Eric Williamson 1.2.0
+ * Add deprecation warning for PE installs
+
 Thu Sep 04 2014 Rob Braden 1.1.7
  * Remove references to the PE console from classification
  
