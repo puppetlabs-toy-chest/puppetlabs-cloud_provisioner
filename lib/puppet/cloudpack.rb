@@ -38,6 +38,9 @@ module Puppet::CloudPack
 
   require 'puppet/cloudpack/installer'
   class << self
+    if Puppet.respond_to?(:pe_version) && Puppet.pe_version.start_with?("3.8")
+      Puppet.warning "Cloud Provisioner is deprecated in PE 3.8. For more information and recommendations, see the release notes documentation here: https://docs.puppetlabs.com/pe/3.8/release_notes.html"
+    end
 
     def add_availability_zone_option(action)
       action.option '--availability-zone=' do
