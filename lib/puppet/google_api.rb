@@ -8,9 +8,15 @@ require 'pathname'
 #
 # @api private
 class Puppet::GoogleAPI
-  # The list of "standard" projects to search for images when hunting by name;
-  # the Google supplied images live in these.
-  StandardImageProjects  = ['debian-cloud', 'centos-cloud']
+  # The list of "standard" projects to search for images when hunting by name.
+  # The set of these canonical projects and images are listed on this page:
+  # https://cloud.google.com/compute/docs/operating-systems/
+  # and can be viewed via `gcloud compute images list`.
+  StandardImageProjects = [
+    'centos-cloud', 'coreos-cloud', 'debian-cloud', 'google-containers',
+    'opensuse-cloud', 'rhel-cloud', 'suse-cloud', 'ubuntu-os-cloud',
+    'windows-cloud'
+  ]
 
   # Create a new instance; this will implicitly authorize if required, or
   # otherwise refresh the access token.  It makes state changes in the rest of
