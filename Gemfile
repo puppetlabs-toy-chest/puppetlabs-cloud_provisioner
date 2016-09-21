@@ -15,7 +15,7 @@ end
 
 gem 'fog', :require => false
 gem 'guid', :require => false
-gem 'google-api-client', :require => false
+gem 'google-api-client', "~> 0.8.7", :require => false
 
 if puppetversion = ENV['PUPPET_GEM_VERSION']
   gem 'puppet', puppetversion, :require => false

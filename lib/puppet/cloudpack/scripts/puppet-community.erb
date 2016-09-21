@@ -13,6 +13,7 @@ baseurl = http://yum.puppetlabs.com/fedora/f$releasever/products/$basearch/
 gpgcheck = 1
 enabled = 1
 gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
+         http://yum.puppetlabs.com/RPM-GPG-KEY-puppet
 EOFYUMREPO
 }
 
@@ -24,12 +25,14 @@ baseurl = http://yum.puppetlabs.com/el/$releasever/products/$basearch/
 gpgcheck = 1
 enabled = 1
 gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
+         http://yum.puppetlabs.com/RPM-GPG-KEY-puppet
 [puppetlabs-deps]
 name = Puppetlabs Dependencies
 baseurl = http://yum.puppetlabs.com/el/$releasever/dependencies/$basearch/
 gpgcheck = 1
 enabled = 1
 gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
+         http://yum.puppetlabs.com/RPM-GPG-KEY-puppet
 EOFYUMREPO
 }
 
@@ -43,7 +46,8 @@ function rpm_install() {
 
 function apt_install() {
   # Download and install the puppetlabs apt public
-  apt-key adv --recv-key --keyserver pool.sks-keyservers.net 4BD6EC30
+  apt-key adv --recv-key --keyserver pool.sks-keyservers.net 1054B7A24BD6EC30
+  apt-key adv --recv-key --keyserver pool.sks-keyservers.net 7F438280EF8D349F
 
   # We need to grab the distro and release in order to populate
   # the apt repo details. We are assuming that the lsb_release command
