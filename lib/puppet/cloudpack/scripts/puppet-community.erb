@@ -66,8 +66,16 @@ function apt_install() {
 deb http://apt.puppetlabs.com/ ${release} main dependencies
 EOFAPTREPO
   apt-get update
+  
+  # Get the latest Puppet revision from the repository
+  <% if options[:puppet_version] %>
+  export LATEST_PUPPET_VER=`apt-cache -n madison puppet | grep Packages | grep <%= options[:puppet_version] %> | head -1 | cut -d"|" -f2 | tr -d ' '`
+  <% end %>
+
   # Install Puppet from Debian repositories
-  apt-get -y install puppet
+  apt-get -y install puppet-common<% if options[:puppet_version] %>=$LATEST_PUPPET_VER<% end %>
+  apt-get -y install puppet<% if options[:puppet_version] %>=$LATEST_PUPPET_VER<% end %>
+
 }
 
 function install_puppet() {
